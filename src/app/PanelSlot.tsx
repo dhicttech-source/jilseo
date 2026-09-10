@@ -1,19 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import type { ServiceDef } from "../adapters";
-import { createPanel, evalInPanel, layoutPanels, navigatePanel, panelUrl, rectOf, setPanelVisible } from "../lib/panels";
-import { insertOrQueue } from "../lib/supabase";
-import { useCloud } from "../store/cloud";
+import { createPanel, layoutPanels, navigatePanel, rectOf, setPanelVisible } from "../lib/panels";
+import { saveNoteFor } from "../lib/notes";
 import { useStage } from "../store/stage";
 import { useWorkstations } from "../store/workstations";
-
-/** 현재 선택 → 없으면 init script가 기록해 둔 최근 선택(60초 이내) */
-const SELECTION_JS = `(() => {
-  const live = String(window.getSelection ? window.getSelection().toString() : '');
-  if (live.trim()) return JSON.stringify({ text: live, source: 'live' });
-  const last = window.__jilseoSel;
-  if (last && Date.now() - last.at < 60000) return JSON.stringify({ text: last.text, source: 'last' });
-  return JSON.stringify({ text: '' });
-})()`;
 
 const PHASE_LABEL: Record<string, string> = {
   creating: "생성 중",
@@ -51,26 +41,10 @@ export function PanelSlot({ service }: { service: ServiceDef }) {
   const isMax = maximized === service.id;
   const [note, setNote] = useState<string | null>(null);
 
-  /** 패널 내 선택 텍스트 → 메모 (서비스·대화 URL·시각 자동) */
   const saveNote = async () => {
     try {
-      const { text } = await evalInPanel<{ text: string }>(service.id, SELECTION_JS, 3000);
-      if (!text.trim()) {
-        setNote("선택된 텍스트 없음 — 패널에서 드래그로 선택한 뒤 눌러주세요");
-        setTimeout(() => setNote(null), 4000);
-        return;
-      }
-      const url = await panelUrl(service.id).catch(() => null);
-      const user = useCloud.getState().user;
-      const res = await insertOrQueue(useCloud.getState().config(), "notes", {
-        service_id: service.id,
-        conversation_url: url,
-        content: text,
-        created_at: new Date().toISOString(),
-        ...(user ? { user_id: user.id } : {}),
-      });
-      setNote(res === "saved" ? `메모 저장 (${text.length}자)` : `메모 큐에 저장 (${text.length}자)`);
-      void useCloud.getState().flush();
+      const r = await saveNoteFor(service.id);
+      setNote(r.message);
     } catch (e) {
       setNote(`메모 실패: ${String(e).slice(0, 40)}`);
     }

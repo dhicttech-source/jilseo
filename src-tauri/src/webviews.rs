@@ -12,6 +12,22 @@ use tauri::{
 pub const SAFARI_USER_AGENT: &str = "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) \
 AppleWebKit/605.1.15 (KHTML, like Gecko) Version/26.0 Safari/605.1.15";
 
+/// 모든 서비스 패널에 주입되는 최소 스크립트.
+/// 선택 텍스트를 추적해 두어, 사용자가 앱 UI의 "메모" 버튼을 눌러 패널이 포커스를 잃어도 직전 선택을 읽을 수 있게 한다.
+/// 페이지 로직에는 개입하지 않는다.
+const PANEL_INIT_SCRIPT: &str = r#"
+(() => {
+  if (window.__jilseoInit) return;
+  window.__jilseoInit = true;
+  document.addEventListener('selectionchange', () => {
+    try {
+      const t = String(window.getSelection ? window.getSelection().toString() : '');
+      if (t.trim()) window.__jilseoSel = { text: t, at: Date.now() };
+    } catch (_) {}
+  });
+})();
+"#;
+
 #[derive(Debug, Clone, Copy, Deserialize)]
 pub struct Rect {
     pub x: f64,
@@ -79,6 +95,7 @@ pub fn create_panel(
     let builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed))
         .data_store_identifier(data_store_id_for(&service_id))
         .user_agent(SAFARI_USER_AGENT)
+        .initialization_script(PANEL_INIT_SCRIPT)
         .on_new_window(popup_policy)
         .zoom_hotkeys_enabled(true);
 

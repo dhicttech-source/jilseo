@@ -12,6 +12,7 @@ import { useLibrary } from "./store/library";
 import { useStage } from "./store/stage";
 import { useWorkstations } from "./store/workstations";
 import { runDiagnostics, summarize } from "./lib/diagnostics";
+import { startDevHarness } from "./lib/devHarness";
 
 type View = "stage" | "settings";
 
@@ -47,6 +48,7 @@ export default function App() {
       await useWorkstations.getState().load();
       await useCloud.getState().init();
       await useLibrary.getState().load();
+      startDevHarness();
     })();
   }, [init]);
 

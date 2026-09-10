@@ -1,7 +1,5 @@
 import { useRef, useState } from "react";
-import { ServiceAdapter, broadcastText } from "../adapters";
-import { insertOrQueue } from "../lib/supabase";
-import { useCloud } from "../store/cloud";
+import { runBroadcast } from "../lib/broadcast";
 import { useDraft } from "../store/draft";
 import { useLibrary } from "../store/library";
 import { useStage } from "../store/stage";
@@ -16,7 +14,6 @@ export function BroadcastBar() {
   const taRef = useRef<HTMLTextAreaElement | null>(null);
   const services = useStage((s) => s.services);
   const stage = useStage((s) => s.stage);
-  const setStatus = useStage((s) => s.setStatus);
 
   const targets = stage
     .map((id) => services.find((s) => s.id === id))
@@ -27,41 +24,16 @@ export function BroadcastBar() {
     if (!body || busy || targets.length === 0) return;
     setBusy(true);
     setSummary(null);
-    const adapters = targets.map((d) => new ServiceAdapter(d));
-    const t0 = performance.now();
-    const results = await broadcastText(body, adapters, (id, phase, detail) => setStatus(id, phase, detail));
-    const ms = Math.round(performance.now() - t0);
-    const ok = Object.values(results).filter((r) => r.ok).length;
-    setSummary(`${ok}/${adapters.length} 전송 · ${ms}ms`);
+    const outcome = runBroadcast(body, targets);
+    if (!outcome) return setBusy(false);
+    // 전송 단계 완료를 기다림 (completion은 응답 관찰까지)
+    while (outcome.ms === 0 && Object.keys(outcome.sent).length === 0) await new Promise((r) => setTimeout(r, 50));
+    setSummary(`${outcome.okCount}/${targets.length} 전송 · ${outcome.ms}ms`);
     setBusy(false);
-    if (ok > 0) setText("");
+    if (outcome.okCount > 0) setText("");
     taRef.current?.focus();
-    if (ok === 0) return;
-
-    // 전송된 패널의 응답을 관찰(완료 배지) → 모두 끝나면 비교 기록 1건 저장. 각 패널 독립.
-    const sent = adapters.filter((a) => results[a.id]?.ok);
-    const responses: Record<string, string> = {};
-    await Promise.all(
-      sent.map(async (a) => {
-        setStatus(a.id, "responding");
-        responses[a.id] = await a
-          .observeResponse((_t, done) => {
-            if (done) setStatus(a.id, "done");
-          })
-          .catch(() => "");
-      }),
-    );
-    const cloud = useCloud.getState();
-    const user = cloud.user;
-    const res = await insertOrQueue(cloud.config(), "comparisons", {
-      prompt: body,
-      responses,
-      device: useStage.getState().device,
-      created_at: new Date().toISOString(),
-      ...(user ? { user_id: user.id } : {}),
-    });
-    setSummary((s) => `${s ?? ""} · 비교 기록 ${res === "saved" ? "저장" : "큐"}`);
-    void cloud.flush();
+    const { saved } = await outcome.completion;
+    if (saved !== "skipped") setSummary((s) => `${s ?? ""} · 비교 기록 ${saved === "saved" ? "저장" : "큐"}`);
   };
 
   return (
