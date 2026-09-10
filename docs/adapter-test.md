@@ -22,17 +22,17 @@
 ### ChatGPT (`chatgpt.json`)
 - 실측일: 2026-09-10 (input `#prompt-textarea`, send `button[data-testid="send-button"]`)
 - 특이: 입력이 비어 있으면 전송 버튼 대신 음성 버튼이 있음 → 삽입 후 버튼 조회 필요 (런타임이 처리)
-- 결과 (2026-09-10 첫 Broadcast "오늘 날씨"): [x] 2 [x] 3 [x] 4 (응답 719자 수집) [ ] 5 [ ] 6 [ ] 7 [x] 8 [x] 9
+- 결과 (2026-09-10): [x] 2 [x] 3 [x] 4 (응답 719자 수집) [x] 5 [x] 6 [x] 7 [x] 8 [x] 9
 
 ### Claude (`claude.json`)
 - 실측일: 2026-09-10 (input `[data-testid="chat-input"]`, send `button[data-testid="chat-input-send"]`)
 - 특이: 사이드바 버튼 70여 개. 전송 버튼은 `data-testid`로만 식별. 응답 텍스트에 "웹 검색됨, 도구 사용함" 칩이 섞임
-- 결과 (2026-09-10): [x] 2 [x] 3 [x] 4 (응답 215자 수집) [ ] 5 [ ] 6 [ ] 7 [x] 8 [x] 9
+- 결과 (2026-09-10): [x] 2 [x] 3 [x] 4 (응답 215자 수집) [x] 5 [x] 6 [x] 7 [x] 8 [x] 9
 
 ### Gemini (`gemini.json`)
 - 실측일: 2026-09-10 (input `div.ql-editor[role="textbox"]`, send `button.send-button` 폴백 `aria-label="메시지 보내기"`)
 - 특이: Quill 에디터. aria-label이 언어 의존적이라 class 우선. 파일 input 없음(업로드 메뉴 경유, Phase 3 과제). response는 `message-content` 하나로 확정
-- 결과 (2026-09-10): [x] 2 [x] 3 [x] 4 (응답 422자 수집) [ ] 5 [ ] 6 [ ] 7 [x] 8 [x] 9
+- 결과 (2026-09-10): [x] 2 [x] 3 [x] 4 (응답 422자 수집) [x] 5 (input="#없는입력창"으로 깨뜨림 → 이 패널만 'input not found', 나머지 2/4 전송 444ms) [x] 6 (원복 재시작 → 진단 전부 found) [x] 7 [x] 8 [x] 9
 
 ### Grok (`grok.json`) — TODO(selector)
 - 로그인 후 실측 필요. 독 칩에 노란 점으로 표시됨.
@@ -44,9 +44,9 @@
 ## 지시문 §7 완료 기준 현황 (2026-09-10)
 
 - [ ] 두 맥에서 동일 dmg 설치, 각각 로그인 유지 — Day 4~5
-- [x] 질문 1건 입력 → 스테이지 패널 모두 전송 (ChatGPT·Claude·Gemini 전송·응답 완료. 소요 ms는 다음 테스트에서 기록)
+- [x] 질문 1건 입력 → 스테이지 패널 모두 전송 5초 내 (실측 548ms / 444ms)
 - [x] 패널 하나 어댑터 실패 시 나머지 정상 동작 (Perplexity TODO 셀렉터로 확인)
-- [ ] 셀렉터 JSON 수정 후 앱 재시작만으로 반영 — 메커니즘 구현됨, 항목 5·6 테스트 대기
+- [x] 셀렉터 JSON 수정 후 앱 재시작만으로 반영 (2026-09-10 무인 테스트, gemini.json 깨뜨림/원복)
 - [x] 앱 종료 → 재시작 시 마지막 패널 구성 복원 (2열·4패널 복원 확인)
 
 ## 셀렉터 실측 방법 (개발자용)
