@@ -1,5 +1,7 @@
 import { useRef, useState } from "react";
+import { isBroadcastTarget } from "../adapters";
 import { runBroadcast } from "../lib/broadcast";
+import { MAX_ATTACHMENT_BYTES, useAttachment } from "../store/attachment";
 import { useDraft } from "../store/draft";
 import { useLibrary } from "../store/library";
 import { useStage } from "../store/stage";
@@ -9,6 +11,20 @@ export function BroadcastBar() {
   const setText = useDraft((s) => s.set);
   const libraryOpen = useLibrary((s) => s.open);
   const toggleLibrary = useLibrary((s) => s.toggle);
+  const attachment = useAttachment((s) => s.file);
+  const setAttachment = useAttachment((s) => s.set);
+  const fileRef = useRef<HTMLInputElement | null>(null);
+
+  const pickFile = (f: File | undefined) => {
+    if (!f) return;
+    if (f.size > MAX_ATTACHMENT_BYTES) return setSummary("첨부는 8MB 이하만 가능합니다");
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = String(reader.result);
+      setAttachment({ name: f.name, mime: f.type || "application/octet-stream", size: f.size, data: dataUrl.split(",")[1] ?? "" });
+    };
+    reader.readAsDataURL(f);
+  };
   const [busy, setBusy] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
@@ -17,7 +33,8 @@ export function BroadcastBar() {
 
   const targets = stage
     .map((id) => services.find((s) => s.id === id))
-    .filter((s): s is NonNullable<typeof s> => !!s);
+    .filter((s): s is NonNullable<typeof s> => !!s)
+    .filter(isBroadcastTarget);
 
   const send = async () => {
     const body = text.trim();
@@ -38,6 +55,25 @@ export function BroadcastBar() {
 
   return (
     <div className="flex shrink-0 items-end gap-2 border-t border-white/10 px-3 py-2">
+      <input
+        ref={fileRef}
+        type="file"
+        className="hidden"
+        onChange={(e) => {
+          pickFile(e.target.files?.[0]);
+          e.target.value = "";
+        }}
+      />
+      <button
+        onClick={() => fileRef.current?.click()}
+        title="파일 1개를 모든 패널에 동시 첨부 (8MB 이하)"
+        className={
+          "h-[44px] shrink-0 rounded-lg border px-3 text-sm " +
+          (attachment ? "border-sky-400/50 bg-sky-400/15 text-sky-200" : "border-white/10 text-white/50 hover:bg-white/10")
+        }
+      >
+        📎
+      </button>
       <button
         onClick={toggleLibrary}
         title="프롬프트 라이브러리"
@@ -67,6 +103,12 @@ export function BroadcastBar() {
         className="min-h-[44px] flex-1 resize-y rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 outline-none placeholder:text-white/30 focus:border-white/30"
       />
       <div className="flex flex-col items-end gap-1">
+        {attachment && (
+          <span className="flex items-center gap-1 rounded bg-sky-400/15 px-2 py-0.5 text-[11px] text-sky-200">
+            📎 {attachment.name} · {(attachment.size / 1024).toFixed(0)}KB
+            <button onClick={() => setAttachment(null)} className="ml-1 text-sky-200/60 hover:text-white">✕</button>
+          </span>
+        )}
         {summary && <span className="text-[11px] text-white/40">{summary}</span>}
         <button
           onClick={() => void send()}

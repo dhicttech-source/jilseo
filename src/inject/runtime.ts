@@ -81,3 +81,53 @@ export const readResponseJs = (responseSel: string) => `(() => {
   const text = last ? (last.innerText || '') : '';
   return JSON.stringify({ count: els.length, length: text.length, text: text.slice(0, 20000) });
 })()`;
+
+/** 마지막 응답 컨테이너의 HTML (마크다운 변환용) */
+export const readResponseHtmlJs = (responseSel: string) => `(() => {
+  const els = document.querySelectorAll(${JSON.stringify(responseSel)});
+  const last = els[els.length - 1];
+  return JSON.stringify({ count: els.length, html: last ? (last.outerHTML || '').slice(0, 400000) : '' });
+})()`;
+
+/**
+ * 파일 첨부: base64 → File → DataTransfer.
+ * 1) fileInput 셀렉터가 있으면 input.files 설정 + change 이벤트
+ * 2) 없으면 입력창(또는 body)에 drop 이벤트, 실패 시 paste 이벤트
+ */
+export const attachFileJs = (
+  fileInputSel: string | undefined,
+  inputSel: string,
+  file: { name: string; mime: string; data: string },
+) => `(() => {
+  const bin = atob(${JSON.stringify(file.data)});
+  const arr = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+  const f = new File([arr], ${JSON.stringify(file.name)}, { type: ${JSON.stringify(file.mime)} });
+  const dt = new DataTransfer();
+  dt.items.add(f);
+  const input = ${fileInputSel ? `document.querySelector(${JSON.stringify(fileInputSel)})` : "null"};
+  if (input && input.tagName === 'INPUT') {
+    try {
+      input.files = dt.files;
+      input.dispatchEvent(new Event('input', { bubbles: true }));
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+      return JSON.stringify({ ok: true, method: 'input', size: f.size });
+    } catch (e) { /* fall through */ }
+  }
+  const target = ${q(inputSel)} || document.body;
+  try {
+    for (const type of ['dragenter', 'dragover', 'drop']) {
+      const ev = new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt });
+      target.dispatchEvent(ev);
+    }
+    return JSON.stringify({ ok: true, method: 'drop', size: f.size });
+  } catch (e) {
+    try {
+      const ev = new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt });
+      target.dispatchEvent(ev);
+      return JSON.stringify({ ok: true, method: 'paste', size: f.size });
+    } catch (e2) {
+      return JSON.stringify({ ok: false, reason: 'drop/paste unsupported: ' + String(e2) });
+    }
+  }
+})()`;

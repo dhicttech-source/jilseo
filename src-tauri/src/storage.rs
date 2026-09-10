@@ -147,3 +147,36 @@ pub fn write_store(app: AppHandle, name: String, value: Value) -> Result<(), Str
 pub fn app_data_dir(app: AppHandle) -> Result<String, String> {
     Ok(app_dir(&app)?.to_string_lossy().into_owned())
 }
+
+/// 파일을 base64로 읽는다 (파일 Broadcast·하네스용). 8MB 상한.
+#[tauri::command]
+pub fn read_file_base64(path: String) -> Result<Value, String> {
+    use base64::Engine;
+    let p = PathBuf::from(&path);
+    let meta = fs::metadata(&p).map_err(|e| format!("{path}: {e}"))?;
+    if meta.len() > 8 * 1024 * 1024 {
+        return Err(format!("파일이 8MB를 넘습니다 ({} bytes)", meta.len()));
+    }
+    let bytes = fs::read(&p).map_err(|e| format!("{path}: {e}"))?;
+    let name = p.file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or_else(|| "file".into());
+    let mime = match p.extension().and_then(|e| e.to_str()).map(|e| e.to_ascii_lowercase()).as_deref() {
+        Some("txt") | Some("md") => "text/plain",
+        Some("csv") => "text/csv",
+        Some("json") => "application/json",
+        Some("pdf") => "application/pdf",
+        Some("png") => "image/png",
+        Some("jpg") | Some("jpeg") => "image/jpeg",
+        Some("gif") => "image/gif",
+        Some("webp") => "image/webp",
+        Some("docx") => "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+        Some("xlsx") => "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        Some("pptx") => "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        _ => "application/octet-stream",
+    };
+    Ok(serde_json::json!({
+        "name": name,
+        "mime": mime,
+        "size": meta.len(),
+        "data": base64::engine::general_purpose::STANDARD.encode(bytes),
+    }))
+}

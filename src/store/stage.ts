@@ -7,6 +7,7 @@ export type PanelPhase =
   | "creating"
   | "ready"
   | "queued"
+  | "attaching"
   | "inserting"
   | "submitting"
   | "sent"
@@ -25,6 +26,12 @@ export interface SupabaseSettings {
   anonKey: string;
 }
 
+export interface WebSlot {
+  id: string;
+  name: string;
+  url: string;
+}
+
 interface Settings {
   version: 1;
   stage: string[];
@@ -33,6 +40,25 @@ interface Settings {
   supabase?: SupabaseSettings | null;
   device?: string;
   onboarded?: boolean;
+  webSlots?: WebSlot[];
+}
+
+/** 웹슬롯 → ServiceDef (셀렉터 없음, Broadcast 제외) */
+export function webSlotToService(w: WebSlot): ServiceDef {
+  return {
+    id: w.id,
+    name: w.name,
+    url: w.url,
+    partition: `persist:${w.id}`,
+    selectors: { input: "TODO(web)", send: "TODO(web)", response: "TODO(web)" },
+    kind: "web",
+  };
+}
+
+function hashId(s: string): string {
+  let h = 5381;
+  for (let i = 0; i < s.length; i++) h = ((h << 5) + h + s.charCodeAt(i)) | 0;
+  return (h >>> 0).toString(36);
 }
 
 const DEFAULT_STAGE = ["chatgpt", "claude", "gemini"];
@@ -51,8 +77,13 @@ interface StageState {
   supabase: SupabaseSettings | null;
   device: string;
   onboarded: boolean;
+  /** JSON 서비스 정의 (웹슬롯 제외) */
+  baseServices: ServiceDef[];
+  webSlots: WebSlot[];
 
   init(): Promise<void>;
+  addWebSlot(url: string, name?: string): string | null;
+  removeWebSlot(id: string): void;
   applyLayout(stage: string[], columns?: number): void;
   setSupabase(cfg: SupabaseSettings | null): void;
   setDevice(name: string): void;
@@ -68,8 +99,8 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function persist(get: () => StageState) {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    const { stage, columns, maximized, supabase, device, onboarded } = get();
-    const settings: Settings = { version: 1, stage, columns, maximized, supabase, device, onboarded };
+    const { stage, columns, maximized, supabase, device, onboarded, webSlots } = get();
+    const settings: Settings = { version: 1, stage, columns, maximized, supabase, device, onboarded, webSlots };
     invoke("write_settings", { settings }).catch(() => {});
   }, 200);
 }
@@ -87,6 +118,8 @@ export const useStage = create<StageState>((set, get) => ({
   supabase: null,
   device: "mac_studio",
   onboarded: false,
+  baseServices: [],
+  webSlots: [],
 
   async init() {
     const [svcRes, settings, dir, inset] = await Promise.all([
@@ -98,12 +131,16 @@ export const useStage = create<StageState>((set, get) => ({
       invoke<string>("services_dir").catch(() => ""),
       measureViewportInset().catch(() => ({ top: 0 })),
     ]);
-    const known = new Set(svcRes.services.map((s) => s.id));
+    const webSlots = settings?.webSlots ?? [];
+    const services = [...svcRes.services, ...webSlots.map(webSlotToService)];
+    const known = new Set(services.map((s) => s.id));
     const stage = (settings?.stage ?? DEFAULT_STAGE).filter((id) => known.has(id)).slice(0, MAX_PANELS);
     const maximized = settings?.maximized && stage.includes(settings.maximized) ? settings.maximized : null;
     set({
       loaded: true,
-      services: svcRes.services,
+      services,
+      baseServices: svcRes.services,
+      webSlots,
       serviceErrors: svcRes.errors,
       servicesDir: dir,
       stage,
@@ -114,6 +151,37 @@ export const useStage = create<StageState>((set, get) => ({
       device: settings?.device ?? "mac_studio",
       onboarded: settings?.onboarded ?? false,
     });
+  },
+
+  addWebSlot(url, name) {
+    let parsed: URL;
+    try {
+      parsed = new URL(/^https?:\/\//i.test(url) ? url : `https://${url}`);
+    } catch {
+      return null;
+    }
+    const id = `web-${hashId(parsed.href)}`;
+    const { webSlots, baseServices, stage } = get();
+    if (!webSlots.some((w) => w.id === id)) {
+      const slot: WebSlot = { id, name: name?.trim() || parsed.hostname.replace(/^www\./, ""), url: parsed.href };
+      const next = [...webSlots, slot];
+      set({ webSlots: next, services: [...baseServices, ...next.map(webSlotToService)] });
+    }
+    if (!stage.includes(id) && stage.length < MAX_PANELS) set({ stage: [...stage, id] });
+    persist(get);
+    return id;
+  },
+
+  removeWebSlot(id) {
+    const { webSlots, baseServices, stage, maximized } = get();
+    const next = webSlots.filter((w) => w.id !== id);
+    set({
+      webSlots: next,
+      services: [...baseServices, ...next.map(webSlotToService)],
+      stage: stage.filter((s) => s !== id),
+      maximized: maximized === id ? null : maximized,
+    });
+    persist(get);
   },
 
   applyLayout(stage, columns) {

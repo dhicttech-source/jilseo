@@ -42,6 +42,7 @@ pub fn run() {
             storage::read_store,
             storage::write_store,
             storage::app_data_dir,
+            storage::read_file_base64,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

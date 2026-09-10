@@ -11,8 +11,11 @@ import { runBroadcastAndWaitSent } from "./broadcast";
 import { saveNoteFor } from "./notes";
 import { evalInPanel } from "./panels";
 import { runDiagnostics } from "./diagnostics";
+import { invoke } from "@tauri-apps/api/core";
 import { useStage } from "../store/stage";
 import { useCloud } from "../store/cloud";
+import { useAttachment } from "../store/attachment";
+import type { Attachment } from "../adapters";
 
 interface Command {
   id: string;
@@ -63,6 +66,16 @@ async function execute(cmd: Command): Promise<unknown> {
         String(cmd.serviceId),
         `(() => { const els = document.querySelectorAll(${JSON.stringify(String(cmd.selector))}); const el = els[els.length-1]; if (!el) return JSON.stringify({ok:false}); const r = document.createRange(); r.selectNodeContents(el); const s = window.getSelection(); s.removeAllRanges(); s.addRange(r); return JSON.stringify({ ok: true, length: s.toString().length }); })()`,
       );
+    case "attach": {
+      const file = await invoke<Attachment>("read_file_base64", { path: String(cmd.path) });
+      useAttachment.getState().set(file);
+      return { name: file.name, mime: file.mime, size: file.size };
+    }
+    case "add_web_slot":
+      return { id: stage.addWebSlot(String(cmd.url), cmd.name as string | undefined), stage: useStage.getState().stage };
+    case "remove_web_slot":
+      stage.removeWebSlot(String(cmd.id));
+      return { stage: useStage.getState().stage };
     case "eval":
       return await evalInPanel(String(cmd.serviceId), String(cmd.js), Number(cmd.timeoutMs ?? 10000));
     default:

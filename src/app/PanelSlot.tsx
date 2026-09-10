@@ -9,6 +9,7 @@ const PHASE_LABEL: Record<string, string> = {
   creating: "생성 중",
   ready: "대기",
   queued: "대기열",
+  attaching: "첨부 중",
   inserting: "입력 중",
   submitting: "전송 중",
   sent: "전송됨",
@@ -21,6 +22,7 @@ const PHASE_COLOR: Record<string, string> = {
   creating: "text-amber-400",
   ready: "text-emerald-400",
   queued: "text-sky-400",
+  attaching: "text-sky-400",
   inserting: "text-sky-400",
   submitting: "text-sky-400",
   sent: "text-emerald-400",
@@ -91,6 +93,7 @@ export function PanelSlot({ service }: { service: ServiceDef }) {
     <section className="flex min-h-0 min-w-0 flex-col bg-[#0f1115]">
       <div className="flex h-7 shrink-0 items-center gap-2 px-2 text-[11px] text-white/60">
         <span className="font-medium text-white/85">{service.name}</span>
+        {service.kind === "web" && <span className="rounded bg-white/10 px-1 text-[10px] text-white/50">웹</span>}
         <span className={PHASE_COLOR[phase]} title={status?.detail}>
           ● {PHASE_LABEL[phase]}
           {phase === "error" && status?.detail ? ` · ${status.detail.slice(0, 60)}` : ""}

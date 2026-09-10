@@ -1,5 +1,5 @@
 import { evalInPanel, panelUrl } from "../lib/panels";
-import { insertTextJs, probeJs, readResponseJs, submitJs } from "../inject/runtime";
+import { attachFileJs, insertTextJs, probeJs, readResponseHtmlJs, readResponseJs, submitJs } from "../inject/runtime";
 
 export interface ServiceDef {
   id: string;
@@ -8,7 +8,19 @@ export interface ServiceDef {
   partition: string;
   selectors: { input: string; send: string; response: string; fileInput?: string };
   verified?: string;
+  /** "web": 웹슬롯(일반 URL). Broadcast 대상에서 제외 */
+  kind?: "ai" | "web";
 }
+
+export interface Attachment {
+  name: string;
+  mime: string;
+  size: number;
+  /** base64 */
+  data: string;
+}
+
+export const isBroadcastTarget = (d: ServiceDef) => d.kind !== "web";
 
 export const isTodoSelector = (s: string | undefined) => !s || s.startsWith("TODO");
 
@@ -92,12 +104,31 @@ export class ServiceAdapter {
     });
   }
 
+  async readResponseHtml(): Promise<string> {
+    const sel = this.def.selectors.response;
+    if (isTodoSelector(sel)) return "";
+    const r = await evalInPanel<{ html: string }>(this.id, readResponseHtmlJs(sel), 5000);
+    return r.html ?? "";
+  }
+
+  /** 파일 1개 첨부. 업로드 처리 시간을 위해 호출 뒤 잠시 기다려야 한다 */
+  async attachFile(file: Attachment): Promise<string> {
+    if (isTodoSelector(this.def.selectors.input)) throw new Error("입력창 셀렉터 미실측 (TODO)");
+    const r = await evalInPanel<{ ok: boolean; method?: string; reason?: string }>(
+      this.id,
+      attachFileJs(this.def.selectors.fileInput, this.def.selectors.input, file),
+      15000,
+    );
+    if (!r.ok) throw new Error(r.reason ?? "attach failed");
+    return r.method ?? "unknown";
+  }
+
   currentConversationUrl(): Promise<string | null> {
     return panelUrl(this.id);
   }
 }
 
-export type SendPhase = "queued" | "inserting" | "submitting" | "sent" | "error";
+export type SendPhase = "queued" | "attaching" | "inserting" | "submitting" | "sent" | "error";
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 const jitter = () => Math.floor(Math.random() * 300); // 지시문 §8: 전송 간격 300ms 랜덤 지터
@@ -110,6 +141,7 @@ export async function broadcastText(
   text: string,
   adapters: ServiceAdapter[],
   report: (id: string, phase: SendPhase, detail?: string) => void,
+  attachment?: Attachment | null,
 ): Promise<Record<string, { ok: boolean; detail?: string }>> {
   const results: Record<string, { ok: boolean; detail?: string }> = {};
   await Promise.all(
@@ -117,6 +149,12 @@ export async function broadcastText(
       report(a.id, "queued");
       try {
         await sleep(jitter());
+        if (attachment) {
+          report(a.id, "attaching");
+          const method = await a.attachFile(attachment);
+          report(a.id, "attaching", method);
+          await sleep(2500 + jitter()); // 업로드 처리 대기
+        }
         report(a.id, "inserting");
         await a.insertText(text);
         await sleep(150 + jitter());

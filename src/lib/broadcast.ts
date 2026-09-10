@@ -1,5 +1,7 @@
-import { ServiceAdapter, broadcastText, type ServiceDef } from "../adapters";
+import { ServiceAdapter, broadcastText, isBroadcastTarget, type Attachment, type ServiceDef } from "../adapters";
+import { htmlToMarkdown } from "./markdown";
 import { insertOrQueue } from "./supabase";
+import { useAttachment } from "../store/attachment";
 import { useCloud } from "../store/cloud";
 import { useStage } from "../store/stage";
 
@@ -15,16 +17,22 @@ export interface BroadcastOutcome {
  * 스테이지 패널 전부에 텍스트 전송 → 응답 관찰 → 비교 기록 1건 저장.
  * UI(BroadcastBar)와 테스트 하네스가 공유하는 단일 진입점.
  */
-export function runBroadcast(text: string, targets?: ServiceDef[]): BroadcastOutcome | null {
+export function runBroadcast(
+  text: string,
+  targets?: ServiceDef[],
+  attachment: Attachment | null = useAttachment.getState().file,
+): BroadcastOutcome | null {
   const body = text.trim();
   const { services, stage, setStatus, device } = useStage.getState();
-  const defs =
-    targets ?? stage.map((id) => services.find((s) => s.id === id)).filter((s): s is ServiceDef => !!s);
+  const defs = (
+    targets ?? stage.map((id) => services.find((s) => s.id === id)).filter((s): s is ServiceDef => !!s)
+  ).filter(isBroadcastTarget);
   if (!body || defs.length === 0) return null;
 
   const adapters = defs.map((d) => new ServiceAdapter(d));
   const t0 = performance.now();
-  const sentPromise = broadcastText(body, adapters, (id, phase, detail) => setStatus(id, phase, detail));
+  const sentPromise = broadcastText(body, adapters, (id, phase, detail) => setStatus(id, phase, detail), attachment);
+  if (attachment) useAttachment.getState().set(null); // 첨부는 1회 전송 후 해제
 
   const outcome: BroadcastOutcome = {
     sent: {},
@@ -37,11 +45,14 @@ export function runBroadcast(text: string, targets?: ServiceDef[]): BroadcastOut
       await Promise.all(
         sent.map(async (a) => {
           setStatus(a.id, "responding");
-          responses[a.id] = await a
+          const text = await a
             .observeResponse((_t, done) => {
               if (done) setStatus(a.id, "done");
             })
             .catch(() => "");
+          // 렌더링 HTML → Markdown (Phase 3). 실패 시 innerText 그대로.
+          const html = await a.readResponseHtml().catch(() => "");
+          responses[a.id] = htmlToMarkdown(html, text);
         }),
       );
       const cloud = useCloud.getState();
