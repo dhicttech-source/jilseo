@@ -6,6 +6,7 @@ import {
   escapeJs,
   insertTextJs,
   probeJs,
+  readInputJs,
   readResponseHtmlJs,
   readResponseJs,
   submitJs,
@@ -67,12 +68,18 @@ export class ServiceAdapter {
 
   async insertText(text: string): Promise<void> {
     if (isTodoSelector(this.def.selectors.input)) throw new Error("입력창 셀렉터 미실측 (TODO)");
-    const r = await evalInPanel<{ ok: boolean; reason?: string }>(
+    const r = await evalInPanel<{ ok: boolean; reason?: string; method?: string; pending?: boolean }>(
       this.id,
       insertTextJs(this.def.selectors.input, text),
       5000,
     );
     if (!r.ok) throw new Error(r.reason ?? "insertText failed");
+    if (r.pending) {
+      // paste 경로: 에디터 반영이 비동기 → 잠시 뒤 실제로 들어갔는지 확인
+      await new Promise((res) => setTimeout(res, 700));
+      const chk = await evalInPanel<{ text: string }>(this.id, readInputJs(this.def.selectors.input), 3000);
+      if (!chk.text.includes(text.slice(0, 20))) throw new Error("insert via paste not reflected");
+    }
   }
 
   /**

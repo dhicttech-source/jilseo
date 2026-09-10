@@ -37,24 +37,22 @@ export const insertTextJs = (inputSel: string, text: string) => `(() => {
   } else {
     document.execCommand('selectAll', false);
     document.execCommand('insertText', false, t);
-    let now = (el.innerText || '').trim();
+    const now = (el.innerText || '').trim();
     if (!now.includes(t.slice(0, 20))) {
-      // Lexical 계열 에디터(Perplexity)는 execCommand를 무시 → paste 이벤트로 삽입
+      // Lexical 계열 에디터(Perplexity)는 execCommand를 무시 → paste 이벤트로 삽입.
+      // 반영이 비동기라 여기서는 확인하지 않고 pending으로 알린다 (앱이 잠시 뒤 readInputJs로 확인).
       try {
         const dt = new DataTransfer();
         dt.setData('text/plain', t);
         el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
-      } catch (e) { /* 다음 폴백 */ }
-      now = (el.innerText || '').trim();
-    }
-    if (!now.includes(t.slice(0, 20))) {
-      // 마지막 폴백: 직접 주입 + input 이벤트
-      el.textContent = t;
-      el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: t }));
+        return JSON.stringify({ ok: true, method: 'paste', pending: true });
+      } catch (e) {
+        return JSON.stringify({ ok: false, reason: 'insertText and paste failed: ' + String(e) });
+      }
     }
   }
   const now = (el.value !== undefined ? el.value : el.innerText || '').trim();
-  return JSON.stringify({ ok: now.length > 0, now: now.slice(0, 80) });
+  return JSON.stringify({ ok: now.length > 0, method: 'execCommand', now: now.slice(0, 80) });
 })()`;
 
 /** 전송 버튼이 있고 활성이면 클릭. 비활성이면 { ok:false, reason:'disabled' } (앱이 재시도) */
@@ -169,4 +167,12 @@ export const escapeJs = () => `(() => {
   document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
   document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
   return JSON.stringify({ ok: true });
+})()`;
+
+
+/** 입력창 현재 텍스트 읽기 (paste 삽입 확인용) */
+export const readInputJs = (inputSel: string) => `(() => {
+  const el = ${q(inputSel)};
+  if (!el) return JSON.stringify({ text: '' });
+  return JSON.stringify({ text: String(el.value !== undefined ? el.value : el.innerText || '').trim().slice(0, 200) });
 })()`;
