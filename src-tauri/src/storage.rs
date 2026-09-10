@@ -98,3 +98,12 @@ pub fn write_settings(app: AppHandle, settings: Value) -> Result<(), String> {
     let s = serde_json::to_string_pretty(&settings).map_err(|e| e.to_string())?;
     fs::write(&path, s).map_err(|e| e.to_string())
 }
+
+/// 진단 결과를 `diagnostics.json`에 기록 (셀렉터 존재 여부·응답 스냅샷). 사용자·개발자가 파일로 확인.
+#[tauri::command]
+pub fn write_diagnostics(app: AppHandle, report: Value) -> Result<String, String> {
+    let path = app_dir(&app)?.join("diagnostics.json");
+    let s = serde_json::to_string_pretty(&report).map_err(|e| e.to_string())?;
+    fs::write(&path, s).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().into_owned())
+}
