@@ -10,6 +10,10 @@
 | 1 | 11:22 | 질서 자동 테스트 1: 한 줄로 인사만 해줘. | chatgpt·claude (gemini 의도적 실패, perplexity TODO) | 2/4 전송 444ms, 격리 확인 |
 | 2 | 11:29 | 질서 자동 테스트 2: 마크다운 예시 요청 | chatgpt·claude·gemini | 3/3 전송 388ms, 응답 3개 Markdown으로 저장 확인 |
 | 3 | 11:35 | 질서 자동 테스트 3: 첨부 파일의 비밀 단어 | chatgpt·claude·gemini | 3/3 전송 1243ms. **첨부가 실제로는 붙지 않음**(하네스 명령 유실) → 파일 첨부 검증은 미완 |
+| 4 | 18:05 | 테스트 4: 첨부 + 비밀 단어 (복귀 후) | chatgpt·claude·gemini | Claude 정답(첨부 OK). ChatGPT는 업로드 중 버튼 비활성 → Enter 폴백 무시. Gemini는 file input 없음 |
+| 5 | 18:29 | 테스트 5 (의도치 않게 재실행) | chatgpt·claude·gemini | 앱 재시작 시 하네스가 옛 명령을 재실행. 첨부 없이 나감 → 하네스에 만료 규칙 추가 |
+| 6 | 18:54 | 테스트 6: 첨부 + 비밀 단어 | 5패널 | Claude·Gemini 정답(**Gemini 업로드 메뉴 경로 성공**). ChatGPT 첨부는 되나 빈 응답. Grok 미전송. Perplexity paste 비동기 실패 |
+| 7 | 19:0x | 테스트 7: 텍스트만, 토큰 포함 | 5패널 | (아래 §7) |
 
 ## 1. 하네스·메모 보강 (완료)
 - 패널 init script가 선택 텍스트를 추적 → "메모" 클릭으로 패널 포커스가 빠져도 직전 선택(60초 이내) 사용
@@ -46,6 +50,29 @@
 - Phase 4 준비: 세션 파티션·UA를 플랫폼별 함수로 분리, nsis 타깃 추가. macOS 컴파일 확인. Windows 빌드는 Windows 머신 필요
 - 새 dmg: `release/jilseo_0.1.0_aarch64.dmg` (HEAD a87aaa8 기준, Phase 3·품질 수정 포함, 안내문 동봉). sha256 8e451341…7f05aa
 - 개발용 앱은 종료해 두었음. 복귀 후 `cd ~/dev/jilseo && npm run tauri dev`로 실행
+
+## 7. 복귀 후 세션 (2026-09-10 18:00~)
+
+### 진짜 원인: 창 가림 → WebKit 정지 (잠금은 그 한 경우)
+- 화면이 잠기지 않았는데도 UI가 죽음 → `visibilityState=hidden`, 하트비트 6초 정지. z-order 조사 결과 **Claude 앱 창이 질서 창을 완전히 덮고 있었음**.
+- macOS WebKit은 가려진 webview를 hidden으로 보고 타이머·렌더링을 정지시킨다. 잠금 화면도 같은 메커니즘.
+- **해결**: UI·패널 webview 모두 `background_throttling(Disabled)` (Tauri 2, macOS 14+). 적용 후 가려진 상태에서도 하트비트 지속 확인.
+- 온보딩의 "화면이 잠기면 멈춤" 문구는 이제 완화 가능 (다음 dmg에서 반영).
+
+### 앱 크래시: 개발용 감시 스레드의 `url()` 호출
+- wry는 페이지 전환 중 URL이 nil이면 `unwrap` panic → 메인 스레드 panic으로 앱 종료.
+- 감시 스레드에서 URL 폴링 제거, `panel_url`/`list_webviews`는 `catch_unwind`로 보호.
+
+### 하네스 안전장치
+- 명령에 `at` 부여, 60초 지난 명령 무시, 시작 시 마지막 결과 id 상속 → 재시작 시 옛 전송 재실행 방지.
+- 하트비트는 `dev_heartbeat.json`으로 분리 (결과 파일 덮어쓰기 방지).
+
+### 어댑터 실측 추가
+- **Grok**: input `div.tiptap[contenteditable]`, send `button[data-testid="chat-submit"]`, fileInput `input[type=file]`
+- **Perplexity**: input `#ask-input` (execCommand 무시 → paste 이벤트 삽입, 비동기 반영이라 readback 확인), send `button[aria-label="제출"]`, fileInput `input[type=file]`, fileMenu "파일 또는 도구 추가"
+- **Gemini** 파일 첨부: `fileMenu`("업로드 및 도구") 클릭 → `input.hidden-file-input` 생성 → files 설정 → Escape. **동작 확인**
+- **ChatGPT** 파일 첨부: 칩까지 붙고 전송되지만 응답이 빈 자리표시자로 남음(2회 재현). 무료 플랜의 파일 처리 제한으로 추정 → 사용자가 패널에서 직접 확인 필요
+- submit: 버튼이 비활성(업로드 중)이면 최대 12초 재시도 후 Enter 폴백
 
 ## 사용자 확인 필요
 - Grok · Perplexity 로그인 후 셀렉터 실측

@@ -176,3 +176,13 @@ export const readInputJs = (inputSel: string) => `(() => {
   if (!el) return JSON.stringify({ text: '' });
   return JSON.stringify({ text: String(el.value !== undefined ? el.value : el.innerText || '').trim().slice(0, 200) });
 })()`;
+
+
+/** 전송 버튼이 속한 form을 requestSubmit (synthetic click을 무시하는 사이트용 폴백) */
+export const requestSubmitJs = (sendSel: string) => `(() => {
+  const btn = ${q(sendSel)};
+  const form = btn ? btn.closest('form') : null;
+  if (!form || typeof form.requestSubmit !== 'function') return JSON.stringify({ ok: false, reason: 'no form' });
+  try { form.requestSubmit(btn); return JSON.stringify({ ok: true, method: 'requestSubmit' }); }
+  catch (e) { return JSON.stringify({ ok: false, reason: String(e) }); }
+})()`;

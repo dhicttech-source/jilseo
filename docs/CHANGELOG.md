@@ -2,6 +2,16 @@
 
 ## [Unreleased]
 
+### Fixed (2026-09-10 저녁)
+- **가려진 창에서 앱이 멈추던 문제**: UI·패널 webview에 `background_throttling(Disabled)` 적용 (macOS 14+). 다른 창에 덮이거나 화면이 잠겨도 전송·응답 관찰이 계속됨
+- 개발 감시 스레드의 `url()` 폴링이 페이지 전환 중 panic을 일으켜 앱이 종료되던 문제 제거. `panel_url`은 panic-safe
+- 전송 버튼이 비활성(파일 업로드 중)일 때 Enter 폴백으로 넘어가 전송이 누락되던 문제 → 최대 12초 활성화 대기
+- 메모/워크스테이션이 쓰는 `panel_url`이 페이지 전환 중 앱을 죽일 수 있던 문제
+
+### Added
+- Grok·Perplexity 셀렉터 실측 기입. Perplexity는 paste 이벤트 삽입 + readback
+- Gemini 파일 첨부: 업로드 메뉴 → 숨은 file input 경로 (`fileMenu` 셀렉터)
+
 ## Phase 3 — 2026-09-10 (구현 완료; 마크다운·웹슬롯 검증, 파일 첨부는 사용자 검증 대기)
 
 ### Added

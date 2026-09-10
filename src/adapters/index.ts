@@ -9,6 +9,7 @@ import {
   readInputJs,
   readResponseHtmlJs,
   readResponseJs,
+  requestSubmitJs,
   submitJs,
 } from "../inject/runtime";
 
@@ -89,13 +90,30 @@ export class ServiceAdapter {
   async submit(waitMs = 12_000): Promise<string> {
     const deadline = Date.now() + waitMs;
     let lastReason = "";
+    const inputSel = this.def.selectors.input;
+    const inputStillHasText = async () => {
+      const chk = await evalInPanel<{ text: string }>(this.id, readInputJs(inputSel), 3000).catch(() => ({ text: "" }));
+      return chk.text.length > 0;
+    };
     while (Date.now() < deadline) {
       const r = await evalInPanel<{ ok: boolean; method?: string; reason?: string }>(
         this.id,
         clickSendJs(this.def.selectors.send),
         5000,
       );
-      if (r.ok) return r.method ?? "click";
+      if (r.ok) {
+        // click을 무시하는 사이트(Grok) 대비: 잠시 뒤 입력창이 비워졌는지로 실제 전송을 판정
+        await new Promise((res) => setTimeout(res, 1200));
+        if (!(await inputStillHasText())) return r.method ?? "click";
+        const rs = await evalInPanel<{ ok: boolean; method?: string }>(this.id, requestSubmitJs(this.def.selectors.send), 3000).catch(
+          () => ({ ok: false }),
+        );
+        if (rs.ok) {
+          await new Promise((res) => setTimeout(res, 1200));
+          if (!(await inputStillHasText())) return "requestSubmit";
+        }
+        break; // Enter 폴백으로
+      }
       lastReason = r.reason ?? "";
       if (lastReason === "missing") break; // 버튼 자체가 없으면 기다려도 소용없음
       await new Promise((res) => setTimeout(res, 500));
