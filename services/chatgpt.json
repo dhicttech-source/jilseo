@@ -4,8 +4,10 @@
   "url": "https://chatgpt.com",
   "partition": "persist:chatgpt",
   "selectors": {
-    "input": "TODO(selector)",
-    "send": "TODO(selector)",
-    "response": "TODO(selector)"
-  }
+    "input": "#prompt-textarea",
+    "send": "button[data-testid=\"send-button\"]",
+    "response": "[data-message-author-role=\"assistant\"]",
+    "fileInput": "input#upload-files"
+  },
+  "verified": "2026-09-10 라이브 DOM 실측 (input·send·fileInput). response는 첫 Broadcast 후 확인"
 }

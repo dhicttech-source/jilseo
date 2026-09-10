@@ -1,3 +1,4 @@
+mod storage;
 mod webviews;
 
 use tauri::{webview::WebviewBuilder, LogicalPosition, LogicalSize, WebviewUrl};
@@ -30,6 +31,13 @@ pub fn run() {
             webviews::layout_panels,
             webviews::destroy_panel,
             webviews::panel_url,
+            webviews::eval_in_panel,
+            webviews::set_panel_visible,
+            webviews::navigate_panel,
+            storage::services_dir,
+            storage::load_services,
+            storage::read_settings,
+            storage::write_settings,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

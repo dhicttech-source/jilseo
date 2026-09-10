@@ -7,5 +7,6 @@
     "input": "TODO(selector)",
     "send": "TODO(selector)",
     "response": "TODO(selector)"
-  }
+  },
+  "verified": "미실측 — 로그인 후 실측 필요. TODO(selector)"
 }

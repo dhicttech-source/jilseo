@@ -1,11 +1,12 @@
 {
   "id": "gemini",
   "name": "Gemini",
-  "url": "https://gemini.google.com",
+  "url": "https://gemini.google.com/app",
   "partition": "persist:gemini",
   "selectors": {
-    "input": "TODO(selector)",
-    "send": "TODO(selector)",
-    "response": "TODO(selector)"
-  }
+    "input": "div.ql-editor[role=\"textbox\"], div[role=\"textbox\"][aria-label*=\"Gemini\"]",
+    "send": "button.send-button, button[aria-label=\"메시지 보내기\"], button[aria-label=\"Send message\"]",
+    "response": "message-content.model-response-text, message-content, model-response"
+  },
+  "verified": "2026-09-10 라이브 DOM 실측 (input·send). response는 첫 Broadcast 후 확인. 파일 입력 없음(업로드 메뉴 경유)"
 }

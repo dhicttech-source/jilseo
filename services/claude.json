@@ -1,11 +1,13 @@
 {
   "id": "claude",
   "name": "Claude",
-  "url": "https://claude.ai",
+  "url": "https://claude.ai/new",
   "partition": "persist:claude",
   "selectors": {
-    "input": "TODO(selector)",
-    "send": "TODO(selector)",
-    "response": "TODO(selector)"
-  }
+    "input": "[data-testid=\"chat-input\"]",
+    "send": "button[data-testid=\"chat-input-send\"]",
+    "response": "div[data-is-streaming], .font-claude-response, .font-claude-message",
+    "fileInput": "input[data-testid=\"file-upload\"]"
+  },
+  "verified": "2026-09-10 라이브 DOM 실측 (input·send·fileInput). response는 첫 Broadcast 후 확인"
 }

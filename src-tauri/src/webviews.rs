@@ -126,3 +126,52 @@ pub fn panel_url(app: AppHandle, service_id: String) -> Result<Option<String>, S
         None => Ok(None),
     }
 }
+
+/// 패널 안에서 JS를 실행하고 결과(JSON 직렬화 문자열)를 돌려준다.
+/// 원격 페이지에 IPC 권한을 주지 않고 앱 → 페이지 방향으로만 접근하는 유일한 통로.
+/// 동기 표현식만 평가된다(Promise는 await되지 않음). 완료 대기는 앱 쪽에서 폴링한다.
+#[tauri::command]
+pub async fn eval_in_panel(
+    app: AppHandle,
+    service_id: String,
+    js: String,
+    timeout_ms: Option<u64>,
+) -> Result<String, String> {
+    let webview = app
+        .get_webview(&panel_label(&service_id))
+        .ok_or_else(|| format!("panel {service_id} not found"))?;
+
+    let (tx, rx) = tokio::sync::oneshot::channel::<String>();
+    let tx = std::sync::Mutex::new(Some(tx));
+    webview
+        .eval_with_callback(js, move |result| {
+            if let Some(tx) = tx.lock().ok().and_then(|mut t| t.take()) {
+                let _ = tx.send(result);
+            }
+        })
+        .map_err(|e| e.to_string())?;
+
+    let timeout = std::time::Duration::from_millis(timeout_ms.unwrap_or(10_000));
+    match tokio::time::timeout(timeout, rx).await {
+        Ok(Ok(result)) => Ok(result),
+        Ok(Err(_)) => Err(format!("eval callback dropped for {service_id}")),
+        Err(_) => Err(format!("eval timed out for {service_id}")),
+    }
+}
+
+#[tauri::command]
+pub fn set_panel_visible(app: AppHandle, service_id: String, visible: bool) -> Result<(), String> {
+    let Some(webview) = app.get_webview(&panel_label(&service_id)) else {
+        return Ok(());
+    };
+    if visible { webview.show() } else { webview.hide() }.map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn navigate_panel(app: AppHandle, service_id: String, url: String) -> Result<(), String> {
+    let webview = app
+        .get_webview(&panel_label(&service_id))
+        .ok_or_else(|| format!("panel {service_id} not found"))?;
+    let parsed: Url = url.parse().map_err(|e| format!("invalid url {url}: {e}"))?;
+    webview.navigate(parsed).map_err(|e| e.to_string())
+}

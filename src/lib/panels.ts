@@ -55,3 +55,37 @@ export const destroyPanel = (serviceId: string) =>
 
 export const panelUrl = (serviceId: string) =>
   invoke<string | null>("panel_url", { serviceId });
+
+/** 패널 안에서 JS 실행. 결과는 wry가 JSON 직렬화한 문자열 → 한 번(필요 시 두 번) 파싱 */
+export async function evalInPanel<T = unknown>(
+  serviceId: string,
+  js: string,
+  timeoutMs = 10_000,
+): Promise<T> {
+  // 예외가 나면 wry가 콜백을 호출하지 않아 타임아웃까지 기다리게 되므로 페이지 안에서 잡는다.
+  const wrapped = `(() => { try { return (${js}); } catch (e) { return JSON.stringify({ __error: String(e && e.stack || e) }); } })()`;
+  const raw = await invoke<string>("eval_in_panel", { serviceId, js: wrapped, timeoutMs });
+  let v: unknown = raw;
+  try {
+    v = JSON.parse(raw);
+    if (typeof v === "string") {
+      try {
+        v = JSON.parse(v);
+      } catch {
+        /* 문자열 자체가 결과 */
+      }
+    }
+  } catch {
+    /* 직렬화되지 않은 원시 문자열 */
+  }
+  if (v && typeof v === "object" && "__error" in (v as Record<string, unknown>)) {
+    throw new Error(`[${serviceId}] page error: ${(v as { __error: string }).__error}`);
+  }
+  return v as T;
+}
+
+export const setPanelVisible = (serviceId: string, visible: boolean) =>
+  invoke<void>("set_panel_visible", { serviceId, visible });
+
+export const navigatePanel = (serviceId: string, url: string) =>
+  invoke<void>("navigate_panel", { serviceId, url });

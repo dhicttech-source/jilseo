@@ -13,6 +13,7 @@
 | Rust (rustup/cargo/rustc) | **없음** | rustup 설치 필요 (Tauri 필수) |
 | Tauri CLI | 없음 | 프로젝트 devDependency(`@tauri-apps/cli`)로 설치 |
 | 개발 폴더 | `~/dev/jilseo` 생성 완료 | — |
+| Day 1 판정 | **GO** (2026-09-10) | `docs/day1-verification.md` |
 
 ## 1. Tauri 2 핵심 기술 결정 (Day 1 검증 대상)
 
@@ -82,10 +83,32 @@ jilseo/
   - Free 프로젝트 7일 비활성 일시정지 방지: Mac Studio cron 일 1회 REST 호출 (별도 작업)
 - 프롬프트 라이브러리 / 메모 / 비교 기록 + 실패 시 로컬 큐 재시도
 - `tauri build` → dmg → MacBook 병행 검증
+- **dmg 첫 실행 안내** (사용자 요청 2026-09-10): ad-hoc 서명·미공증이라 다른 맥에서는 Gatekeeper가 막힘 →
+  - dmg 안에 `처음 실행하는 법.rtf` 동봉 + dmg 배경 이미지에 3단계(앱을 Applications로 드래그 → 우클릭 '열기' 또는 `xattr -cr` → 각 서비스 로그인) 표기
+  - 앱 첫 실행 온보딩 화면: 서비스별 로그인 방법, 패스키 불가·비밀번호 로그인 안내, 셀렉터 JSON 위치 안내
+  - 배포 범위가 넓어지면 Apple Developer Program 가입 후 Developer ID 서명 + 공증으로 전환 (tauri.conf `bundle.macOS.signingIdentity`, 공증 env)
 
 ### 이후 — Phase 3
 
 - 파일 Broadcast(DataTransfer + drop), 웹슬롯, 즐겨찾기, turndown 마크다운 변환
+
+### Phase 4 — Windows 버전 (사용자 요청 2026-09-10, macOS 완료 후 착수)
+
+Tauri 2는 Windows에서 WebView2(Chromium)로 동작하며 프론트·어댑터 코드는 그대로 재사용한다. 바뀌는 것은 Rust 브리지의 플랫폼 분기와 패키징.
+
+| 항목 | macOS | Windows | 작업 |
+|---|---|---|---|
+| 세션 파티션 | `data_store_identifier` | `data_directory(<app_data>/partitions/<id>)` | `cfg(target_os)` 분기 |
+| User-Agent | Safari 고정 | WebView2 기본(Edge). Google 로그인 차단 시 Chrome UA로 고정 | Day 1과 같은 Go/No-Go 검증 반복 |
+| 팝업(OAuth) | wry `Allow` | wry `Allow` (WebView2 NewWindowRequested) | 동작 확인만 |
+| 타이틀바 인셋 | 32px 자가 보정 | 0 예상, 같은 코드로 자가 보정 | 확인만 |
+| 패스키 | 불가 | WebView2는 Windows Hello 패스키 가능성 있음 | 실측 |
+| 설치 파일 | dmg | NSIS `.exe` 또는 MSI (`tauri build` targets) | 설정 추가 |
+| 서명 | ad-hoc | 미서명 시 SmartScreen 경고 → 첫 실행 안내에 '추가 정보 → 실행' 절차 포함 | 안내 문서 |
+| 빌드 환경 | 로컬 맥 | **맥에서 크로스 빌드 불가** → Windows PC 또는 GitHub Actions `windows-latest` 러너 | 지시문의 'CI 없음' 원칙과 충돌하므로 착수 시 결정 필요 |
+| 로컬 저장 경로 | `~/Library/Application Support/jilseo` | `%APPDATA%\jilseo` (`data_dir()`가 자동 처리) | 없음 |
+
+순서: (1) Windows 빌드 환경 확보 → (2) Day 1 검증 재현(3서비스 로그인·유지) → (3) 파티션·UA 분기 → (4) 어댑터 테스트 체크리스트 재실행 → (5) 설치 파일 + 첫 실행 안내
 
 ## 4. 제약 재확인
 
