@@ -1,5 +1,5 @@
 import { evalInPanel, panelUrl } from "./panels";
-import { insertOrQueue } from "./supabase";
+import { saveRow } from "./supabase";
 import { useCloud } from "../store/cloud";
 
 /** 현재 선택 → 없으면 init script가 기록해 둔 최근 선택(60초 이내) */
@@ -24,13 +24,10 @@ export async function saveNoteFor(serviceId: string): Promise<NoteResult> {
   if (!text.trim()) return { ok: false, message: "선택된 텍스트 없음 — 패널에서 드래그로 선택한 뒤 눌러주세요" };
   const url = await panelUrl(serviceId).catch(() => null);
   const cloud = useCloud.getState();
-  const user = cloud.user;
-  const saved = await insertOrQueue(cloud.config(), "notes", {
+  const saved = await saveRow(cloud.config(), cloud.user, "notes", {
     service_id: serviceId,
     conversation_url: url,
     content: text,
-    created_at: new Date().toISOString(),
-    ...(user ? { user_id: user.id } : {}),
   });
   void cloud.flush();
   return {

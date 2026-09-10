@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
-import type { ServiceDef } from "../adapters";
+import { TODO_SELECTOR_PREFIX, type ServiceDef } from "../adapters";
 import { measureViewportInset } from "../lib/panels";
 
 export type PanelPhase =
@@ -50,7 +50,7 @@ export function webSlotToService(w: WebSlot): ServiceDef {
     name: w.name,
     url: w.url,
     partition: `persist:${w.id}`,
-    selectors: { input: "TODO(web)", send: "TODO(web)", response: "TODO(web)" },
+    selectors: { input: `${TODO_SELECTOR_PREFIX}(web)`, send: `${TODO_SELECTOR_PREFIX}(web)`, response: `${TODO_SELECTOR_PREFIX}(web)` },
     kind: "web",
   };
 }
@@ -63,6 +63,19 @@ function hashId(s: string): string {
 
 const DEFAULT_STAGE = ["chatgpt", "claude", "gemini"];
 export const MAX_PANELS = 8;
+export const MAX_COLUMNS = 4;
+
+/** 열 수는 1~MAX_COLUMNS */
+const clampColumns = (n: number) => Math.min(MAX_COLUMNS, Math.max(1, n));
+
+/** 서비스 목록 = JSON 정의 + 웹슬롯 */
+const composeServices = (base: ServiceDef[], webSlots: WebSlot[]) => [...base, ...webSlots.map(webSlotToService)];
+
+/** 스테이지에는 존재하는 서비스만, 최대 MAX_PANELS개 */
+const sanitizeStage = (ids: string[], services: ServiceDef[]) => {
+  const known = new Set(services.map((s) => s.id));
+  return ids.filter((id) => known.has(id)).slice(0, MAX_PANELS);
+};
 
 interface StageState {
   loaded: boolean;
@@ -132,9 +145,8 @@ export const useStage = create<StageState>((set, get) => ({
       measureViewportInset().catch(() => ({ top: 0 })),
     ]);
     const webSlots = settings?.webSlots ?? [];
-    const services = [...svcRes.services, ...webSlots.map(webSlotToService)];
-    const known = new Set(services.map((s) => s.id));
-    const stage = (settings?.stage ?? DEFAULT_STAGE).filter((id) => known.has(id)).slice(0, MAX_PANELS);
+    const services = composeServices(svcRes.services, webSlots);
+    const stage = sanitizeStage(settings?.stage ?? DEFAULT_STAGE, services);
     const maximized = settings?.maximized && stage.includes(settings.maximized) ? settings.maximized : null;
     set({
       loaded: true,
@@ -144,7 +156,7 @@ export const useStage = create<StageState>((set, get) => ({
       serviceErrors: svcRes.errors,
       servicesDir: dir,
       stage,
-      columns: Math.min(4, Math.max(1, settings?.columns ?? 3)),
+      columns: clampColumns(settings?.columns ?? 3),
       maximized,
       insetTop: inset.top,
       supabase: settings?.supabase ?? null,
@@ -153,6 +165,7 @@ export const useStage = create<StageState>((set, get) => ({
     });
   },
 
+  /** 웹슬롯을 등록하고(없으면) 스테이지에도 올린다. 주의: 두 가지 상태를 함께 바꾼다. */
   addWebSlot(url, name) {
     let parsed: URL;
     try {
@@ -165,7 +178,7 @@ export const useStage = create<StageState>((set, get) => ({
     if (!webSlots.some((w) => w.id === id)) {
       const slot: WebSlot = { id, name: name?.trim() || parsed.hostname.replace(/^www\./, ""), url: parsed.href };
       const next = [...webSlots, slot];
-      set({ webSlots: next, services: [...baseServices, ...next.map(webSlotToService)] });
+      set({ webSlots: next, services: composeServices(baseServices, next) });
     }
     if (!stage.includes(id) && stage.length < MAX_PANELS) set({ stage: [...stage, id] });
     persist(get);
@@ -177,7 +190,7 @@ export const useStage = create<StageState>((set, get) => ({
     const next = webSlots.filter((w) => w.id !== id);
     set({
       webSlots: next,
-      services: [...baseServices, ...next.map(webSlotToService)],
+      services: composeServices(baseServices, next),
       stage: stage.filter((s) => s !== id),
       maximized: maximized === id ? null : maximized,
     });
@@ -185,10 +198,9 @@ export const useStage = create<StageState>((set, get) => ({
   },
 
   applyLayout(stage, columns) {
-    const known = new Set(get().services.map((s) => s.id));
     set({
-      stage: stage.filter((id) => known.has(id)).slice(0, MAX_PANELS),
-      columns: columns ? Math.min(4, Math.max(1, columns)) : get().columns,
+      stage: sanitizeStage(stage, get().services),
+      columns: columns ? clampColumns(columns) : get().columns,
       maximized: null,
     });
     persist(get);
@@ -231,7 +243,7 @@ export const useStage = create<StageState>((set, get) => ({
   },
 
   setColumns(n) {
-    set({ columns: Math.min(4, Math.max(1, n)) });
+    set({ columns: clampColumns(n) });
     persist(get);
   },
 

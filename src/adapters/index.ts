@@ -27,7 +27,9 @@ export interface ResponseSnapshot {
   text: string;
 }
 
-export const isTodoSelector = (s: string | undefined) => !s || s.startsWith("TODO");
+/** 미실측 셀렉터 표기 규칙 (지시문 §9): `TODO(selector)`, `TODO(web)` 등 */
+export const TODO_SELECTOR_PREFIX = "TODO";
+export const isTodoSelector = (s: string | undefined) => !s || s.startsWith(TODO_SELECTOR_PREFIX);
 
 export interface ProbeResult {
   url: string;

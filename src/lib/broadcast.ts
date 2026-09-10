@@ -7,7 +7,7 @@ import {
   type ServiceDef,
 } from "../adapters";
 import { htmlToMarkdown } from "./markdown";
-import { insertOrQueue } from "./supabase";
+import { saveRow } from "./supabase";
 import { useAttachment } from "../store/attachment";
 import { useCloud } from "../store/cloud";
 import { useStage } from "../store/stage";
@@ -70,14 +70,7 @@ export function runBroadcast(
         }),
       );
       const cloud = useCloud.getState();
-      const user = cloud.user;
-      const saved = await insertOrQueue(cloud.config(), "comparisons", {
-        prompt: body,
-        responses,
-        device,
-        created_at: new Date().toISOString(),
-        ...(user ? { user_id: user.id } : {}),
-      });
+      const saved = await saveRow(cloud.config(), cloud.user, "comparisons", { prompt: body, responses, device });
       void cloud.flush();
       return { responses, saved };
     }),

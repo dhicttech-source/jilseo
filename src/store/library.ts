@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { readStore, writeStore } from "../lib/store";
-import { deleteOrQueue, getClient, insertOrQueue } from "../lib/supabase";
+import { deleteOrQueue, getClient, saveRow } from "../lib/supabase";
 import { useCloud } from "./cloud";
 
 export interface Prompt {
@@ -48,8 +48,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   },
 
   async add({ folder, title, body }) {
-    const cfg = useCloud.getState().config();
-    const user = useCloud.getState().user;
+    const cloud = useCloud.getState();
     const row: Prompt = {
       id: crypto.randomUUID(),
       folder: folder.trim() || null,
@@ -60,7 +59,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
     const prompts = [...get().prompts, row];
     set({ prompts });
     await cache(prompts);
-    const res = await insertOrQueue(cfg, "prompts", { ...row, ...(user ? { user_id: user.id } : {}) });
+    const res = await saveRow(cloud.config(), cloud.user, "prompts", { ...row });
     set({ message: res === "queued" ? "오프라인 — 큐에 저장됨" : null });
     await useCloud.getState().flush();
   },

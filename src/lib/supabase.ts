@@ -85,6 +85,24 @@ async function enqueue(item: Omit<QueueItem, "id" | "at">) {
   await writeStore("queue", q);
 }
 
+/**
+ * 도메인 행 저장 규칙: 로그인돼 있으면 user_id를 붙이고 created_at이 없으면 지금 시각을 넣어 insertOrQueue.
+ * comparisons·notes·prompts 모두 이 한 곳을 거친다 (RLS 컬럼 규칙의 단일 소스).
+ */
+export async function saveRow(
+  cfg: SupabaseConfig | null,
+  user: { id: string } | null,
+  table: QueueTable,
+  row: Record<string, unknown>,
+): Promise<"saved" | "queued"> {
+  const full = {
+    created_at: new Date().toISOString(),
+    ...row,
+    ...(user ? { user_id: user.id } : {}),
+  };
+  return insertOrQueue(cfg, table, full);
+}
+
 /** 삽입 시도 → 실패(미로그인·오프라인·오류)면 큐에 적재. 반환: 'saved' | 'queued' */
 export async function insertOrQueue(
   cfg: SupabaseConfig | null,

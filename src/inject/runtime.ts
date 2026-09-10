@@ -5,15 +5,18 @@
  * - 셀렉터는 콤마 구분 목록 허용 (querySelector가 첫 매치 반환)
  */
 
+import { TODO_SELECTOR_PREFIX } from "../adapters";
+
 const q = (sel: string) => `document.querySelector(${JSON.stringify(sel)})`;
 
 /** 셀렉터 존재·가시성 진단 */
 export const probeJs = (selectors: Record<string, string | undefined>) => `(() => {
   const out = {};
   const sels = ${JSON.stringify(selectors)};
+  const TODO = ${JSON.stringify(TODO_SELECTOR_PREFIX)};
   for (const k in sels) {
     if (!sels[k]) continue;
-    if (String(sels[k]).startsWith('TODO')) { out[k] = { found: false, todo: true }; continue; }
+    if (String(sels[k]).startsWith(TODO)) { out[k] = { found: false, todo: true }; continue; }
     let el = null;
     try { el = document.querySelector(sels[k]); } catch (e) { out[k] = { found: false, invalid: String(e) }; continue; }
     out[k] = el ? { found: true, tag: el.tagName.toLowerCase(), vis: !!(el.offsetWidth || el.offsetHeight) } : { found: false };
