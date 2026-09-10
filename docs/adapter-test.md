@@ -23,23 +23,30 @@
 - 실측일: 2026-09-10 (input `#prompt-textarea`, send `button[data-testid="send-button"]`)
 - 특이: 입력이 비어 있으면 전송 버튼 대신 음성 버튼이 있음 → 삽입 후 버튼 조회 필요 (런타임이 처리)
 - 결과 (2026-09-10): [x] 2 [x] 3 [x] 4 (응답 719자 수집) [x] 5 [x] 6 [x] 7 [x] 8 [x] 9
+- 파일 첨부 (2026-09-10 테스트 4·6): 파일 칩까지 붙고 전송되나 응답이 빈 자리표시자로 남음. 이후 텍스트 전송(테스트 7)도 응답 없음 → 계정 상태(무료 플랜 한도) 확인 필요
 
 ### Claude (`claude.json`)
 - 실측일: 2026-09-10 (input `[data-testid="chat-input"]`, send `button[data-testid="chat-input-send"]`)
 - 특이: 사이드바 버튼 70여 개. 전송 버튼은 `data-testid`로만 식별. 응답 텍스트에 "웹 검색됨, 도구 사용함" 칩이 섞임
 - 결과 (2026-09-10): [x] 2 [x] 3 [x] 4 (응답 215자 수집) [x] 5 [x] 6 [x] 7 [x] 8 [x] 9
+- 파일 첨부 (2026-09-10 테스트 4·6): `input[data-testid=file-upload]`에 files 설정, 비밀 단어 정답 → **통과**
 
 ### Gemini (`gemini.json`)
 - 실측일: 2026-09-10 (input `div.ql-editor[role="textbox"]`, send `button.send-button` 폴백 `aria-label="메시지 보내기"`)
 - 특이: Quill 에디터. aria-label이 언어 의존적이라 class 우선. 파일 input 없음(업로드 메뉴 경유, Phase 3 과제). response는 `message-content` 하나로 확정
 - 결과 (2026-09-10): [x] 2 [x] 3 [x] 4 (응답 422자 수집) [x] 5 (input="#없는입력창"으로 깨뜨림 → 이 패널만 'input not found', 나머지 2/4 전송 444ms) [x] 6 (원복 재시작 → 진단 전부 found) [x] 7 [x] 8 [x] 9
+- 파일 첨부 (2026-09-10 테스트 6): 업로드 메뉴 → hidden-file-input 경로로 첨부, 비밀 단어 정답 → **통과**
 
-### Grok (`grok.json`) — TODO(selector)
-- 로그인 후 실측 필요. 독 칩에 노란 점으로 표시됨.
+### Grok (`grok.json`)
+- 실측일: 2026-09-10 (input `div.tiptap[contenteditable]`, send `button[data-testid="chat-submit"]`, fileInput `input[type=file]`)
+- 특이: 2026-09-10 시점 "나이를 확인해 주세요" 모달이 전송을 막음 → 패널에서 1회 처리 필요. response 셀렉터는 첫 정상 응답 후 실측 필요
+- 결과: [ ] 2 [ ] 3 [ ] 4 (모달 처리 후 재검증)
 
-### Perplexity (`perplexity.json`) — TODO(selector)
-- 로그인 후 실측 필요. 독 칩에 노란 점으로 표시됨.
-- 2026-09-10 스테이지에 올린 채 Broadcast → 이 패널만 실패, 나머지 3개 정상 → **실패 격리 확인**
+### Perplexity (`perplexity.json`)
+- 실측일: 2026-09-10 (input `#ask-input` — execCommand 무시, paste 이벤트로 삽입; send `button[aria-label="제출"]`; fileInput `input[type=file]`; fileMenu "파일 또는 도구 추가")
+- 특이: Lexical 계열 에디터. 삽입 반영이 비동기라 어댑터가 700ms 뒤 readback으로 확인. aria-label이 언어 의존적(영문 UI면 "Submit")
+- 결과 (2026-09-10 테스트 7): [x] 2 [x] 3 [x] 4 (토큰 정답 수집) [ ] 5 [ ] 6 [x] 7 [x] 8 [x] 9
+- 셀렉터 미실측 상태였던 오전에는 이 패널만 실패, 나머지 정상 → **실패 격리 확인**
 
 ## 지시문 §7 완료 기준 현황 (2026-09-10)
 

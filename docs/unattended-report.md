@@ -13,7 +13,8 @@
 | 4 | 18:05 | 테스트 4: 첨부 + 비밀 단어 (복귀 후) | chatgpt·claude·gemini | Claude 정답(첨부 OK). ChatGPT는 업로드 중 버튼 비활성 → Enter 폴백 무시. Gemini는 file input 없음 |
 | 5 | 18:29 | 테스트 5 (의도치 않게 재실행) | chatgpt·claude·gemini | 앱 재시작 시 하네스가 옛 명령을 재실행. 첨부 없이 나감 → 하네스에 만료 규칙 추가 |
 | 6 | 18:54 | 테스트 6: 첨부 + 비밀 단어 | 5패널 | Claude·Gemini 정답(**Gemini 업로드 메뉴 경로 성공**). ChatGPT 첨부는 되나 빈 응답. Grok 미전송. Perplexity paste 비동기 실패 |
-| 7 | 19:0x | 테스트 7: 텍스트만, 토큰 포함 | 5패널 | (아래 §7) |
+| 7 | 19:01 | 테스트 7: 텍스트만, 토큰 질서-OK-7 | 5패널 | 5/5 전송 1418ms. Claude·Perplexity 토큰 정답, Gemini 응답 수집. ChatGPT 응답 없음. Grok 응답 없음 |
+| 8 | 19:06 | 테스트 8: Grok 단독, 토큰 질서-OK-8 | grok | 입력은 비워지나 메시지 미생성 → **Grok에 '나이 확인' 모달이 떠 있어 차단됨** (사용자 처리 필요) |
 
 ## 1. 하네스·메모 보강 (완료)
 - 패널 init script가 선택 텍스트를 추적 → "메모" 클릭으로 패널 포커스가 빠져도 직전 선택(60초 이내) 사용
@@ -72,7 +73,12 @@
 - **Perplexity**: input `#ask-input` (execCommand 무시 → paste 이벤트 삽입, 비동기 반영이라 readback 확인), send `button[aria-label="제출"]`, fileInput `input[type=file]`, fileMenu "파일 또는 도구 추가"
 - **Gemini** 파일 첨부: `fileMenu`("업로드 및 도구") 클릭 → `input.hidden-file-input` 생성 → files 설정 → Escape. **동작 확인**
 - **ChatGPT** 파일 첨부: 칩까지 붙고 전송되지만 응답이 빈 자리표시자로 남음(2회 재현). 무료 플랜의 파일 처리 제한으로 추정 → 사용자가 패널에서 직접 확인 필요
-- submit: 버튼이 비활성(업로드 중)이면 최대 12초 재시도 후 Enter 폴백
+- submit: 버튼이 비활성(업로드 중)이면 최대 12초 재시도. click 후 입력창이 비워지지 않으면 `form.requestSubmit()` → Enter 순 폴백
+- **Perplexity 전송·응답 검증 완료** (토큰 정답, response `[class*="prose"]`)
+- **Grok**: 전송 코드는 준비됐으나 패널에 "나이를 확인해 주세요" 모달이 떠 있어 메시지가 생성되지 않음. 사용자가 모달을 한 번 처리하면 재검증 필요 (전송 상한 8회 소진)
+- **ChatGPT**: 텍스트 전송(테스트 7)에도 응답이 빈 자리표시자로 남음(3회 연속, 첫 세션 11:29에는 정상). 패널에서 직접 확인 필요 — 무료 플랜 한도 도달 가능성
+
+## 테스트 전송 집계: 8/8 사용 (사용자 승인 상한 도달, 추가 전송 없음)
 
 ## 사용자 확인 필요
 - Grok · Perplexity 로그인 후 셀렉터 실측
