@@ -17,7 +17,10 @@
   },
   "bundle": {
     "active": true,
-    "targets": ["app", "dmg"],
+    "targets": [
+      "app",
+      "dmg"
+    ],
     "resources": {
       "../services/*.json": "services/"
     },
@@ -30,7 +33,22 @@
     ],
     "macOS": {
       "minimumSystemVersion": "14.0",
-      "signingIdentity": "-"
+      "signingIdentity": "-",
+      "dmg": {
+        "background": "../dmg/background.png",
+        "windowSize": {
+          "width": 660,
+          "height": 420
+        },
+        "appPosition": {
+          "x": 180,
+          "y": 250
+        },
+        "applicationFolderPosition": {
+          "x": 480,
+          "y": 250
+        }
+      }
     }
   }
 }

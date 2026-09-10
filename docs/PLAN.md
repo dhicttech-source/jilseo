@@ -14,6 +14,8 @@
 | Tauri CLI | 없음 | 프로젝트 devDependency(`@tauri-apps/cli`)로 설치 |
 | 개발 폴더 | `~/dev/jilseo` 생성 완료 | — |
 | Day 1 판정 | **GO** (2026-09-10) | `docs/day1-verification.md` |
+| Phase 1 | 핵심 완료 (2026-09-10) | `docs/adapter-test.md` |
+| Phase 2 | 구현 완료, Supabase 프로젝트 생성·dmg 병행 검증 대기 (2026-09-10) | `docs/CHANGELOG.md` |
 
 ## 1. Tauri 2 핵심 기술 결정 (Day 1 검증 대상)
 

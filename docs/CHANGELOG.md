@@ -2,6 +2,18 @@
 
 ## [Unreleased]
 
+## Phase 2 — 2026-09-10 (구현 완료, Supabase 연동 검증 대기)
+
+### Added
+- 워크스테이션: 현재 패널 구성 + 각 패널 대화 URL 저장/전환/덮어쓰기/삭제 (`workstations.json`)
+- Supabase 연동: `supabase/schema.sql`(prompts·notes·comparisons + RLS), 이메일 로그인, 세션은 `session.json`에 보관
+- 오프라인 큐: 저장 실패 시 `queue.json`에 적재, 로그인·다음 저장 시 재시도
+- 프롬프트 라이브러리(📚): 폴더별, 클릭 시 입력창 삽입, 로컬 캐시 + 클라우드 동기화
+- 메모: 패널 헤더 "메모" → 패널 안 선택 텍스트를 서비스·대화 URL·시각과 함께 저장
+- 비교 기록: Broadcast 1회 = 1레코드, 모든 패널 응답 완료 후 저장, device 필드
+- 설정 화면(Supabase URL·anon key·로그인·기기 이름), 첫 실행 온보딩(패스키·팝업·셀렉터 안내)
+- dmg: 배경 이미지에 설치 3단계, `처음 실행하는 법.txt` 동봉 (`npm run dmg` → `scripts/finish-dmg.sh`)
+
 ## Phase 1 — 2026-09-10 (핵심 완료. 남은 검증: 셀렉터 JSON 수정→재시작 반영, 최대화)
 
 ### Added
