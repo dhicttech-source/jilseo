@@ -2,6 +2,24 @@
 
 ## [Unreleased]
 
+## Phase 3 — 2026-09-10 (구현 완료; 마크다운·웹슬롯 검증, 파일 첨부는 사용자 검증 대기)
+
+### Added
+- 파일 Broadcast(📎): 파일 1개를 모든 패널에 동시 첨부. `input.files` → drop 이벤트 → paste 폴백. 8MB 상한
+- 웹슬롯: 독 "+ URL"로 일반 URL 패널 추가, ★ 즐겨찾기(`favorites.json`), Broadcast 대상에서 제외
+- 응답 HTML → Markdown(turndown) 변환 후 비교 기록에 저장 (버튼·svg·숨김 요소 제거, 코드 펜스 언어 유지)
+- 개발 도구: 파일 기반 테스트 하네스(`scripts/harness.py`, dev 빌드 전용), `scripts/dev-restart.sh`, Rust 개발 감시 스레드(webview URL 기록·UI 리로드 플래그)
+- Supabase keepalive: `scripts/keepalive.sh` + launchd `com.dhict.jilseo.keepalive` (매일 09:15)
+- Phase 4 대비: 세션 파티션·UA를 플랫폼별 함수로 분리(`apply_session_partition`, `apply_user_agent`), Windows는 `data_directory`. nsis 타깃 추가(빌드는 Windows 머신 필요)
+
+### Fixed
+- 기존 대화가 있는 패널에서 이전 응답을 새 응답으로 오인 → 전송 전 스냅샷(`snapshotResponse`)과 비교
+- 메모: 패널 포커스가 빠져 선택이 사라져도 init script가 기록한 직전 선택 사용
+
+### Known limitations
+- **화면 잠금 중에는 앱이 멈춤** (WKWebView가 가려진 페이지를 정지). 온보딩·설치 안내에 명시
+- Grok·Perplexity 셀렉터 미실측
+
 ## Phase 2 — 2026-09-10 (Supabase 연동 검증: 로그인·프롬프트·비교 기록 OK, 메모 재검증 중)
 
 ### Added

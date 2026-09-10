@@ -25,6 +25,10 @@ export function Onboarding({ onSettings }: { onSettings: () => void }) {
             사이트가 개편되어 전송이 실패하면 헤더의 <b className="text-white/90">셀렉터 JSON 폴더</b>에서 해당 서비스 JSON을 고치고 앱을 재시작하면 됩니다.
           </li>
           <li>
+            <b className="text-white/90">화면이 잠기면 앱이 멈춥니다.</b> 잠금 화면이 창을 가리는 동안 macOS가 모든 패널의 동작을 정지시키므로,
+            긴 응답을 기다릴 때는 화면을 잠그지 마세요. 잠금을 풀면 그대로 이어집니다.
+          </li>
+          <li>
             프롬프트·메모·비교 기록을 두 맥 간 공유하려면 <b className="text-white/90">설정</b>에서 Supabase를 연결하세요. 없어도 로컬로 동작합니다.
           </li>
         </ol>

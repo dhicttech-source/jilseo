@@ -19,7 +19,8 @@
     "active": true,
     "targets": [
       "app",
-      "dmg"
+      "dmg",
+      "nsis"
     ],
     "resources": {
       "../services/*.json": "services/"
@@ -48,6 +49,15 @@
           "x": 480,
           "y": 250
         }
+      }
+    },
+    "windows": {
+      "nsis": {
+        "installMode": "currentUser",
+        "languages": [
+          "Korean",
+          "English"
+        ]
       }
     }
   }

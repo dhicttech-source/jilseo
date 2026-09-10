@@ -45,11 +45,51 @@ pub struct PanelLayout {
 /// OAuth 로그인(Google 등)은 `window.open` 팝업으로 진행되는 경우가 많다.
 /// wry는 핸들러가 없으면 팝업을 조용히 거부하므로, https 팝업만 허용한다.
 /// `Allow`는 호출한 webview와 같은 쿠키 저장소를 공유하는 네이티브 창을 연다.
-fn popup_policy(url: Url, _features: NewWindowFeatures) -> NewWindowResponse<tauri::Wry> {
+fn popup_policy<R: tauri::Runtime>(url: Url, _features: NewWindowFeatures) -> NewWindowResponse<R> {
     if url.scheme() == "https" {
         NewWindowResponse::Allow
     } else {
         NewWindowResponse::Deny
+    }
+}
+
+/// 서비스별 세션 분리. 플랫폼마다 수단이 다르다 (Phase 4 Windows 대비).
+/// - macOS: `data_store_identifier` (WKWebsiteDataStore, macOS 14+)
+/// - Windows/Linux: `data_directory(<app_data>/partitions/<id>)` (WebView2 user data folder)
+fn apply_session_partition<R: tauri::Runtime>(
+    app: &tauri::AppHandle<R>,
+    builder: WebviewBuilder<R>,
+    service_id: &str,
+) -> Result<WebviewBuilder<R>, String> {
+    #[cfg(target_os = "macos")]
+    {
+        let _ = app;
+        Ok(builder.data_store_identifier(data_store_id_for(service_id)))
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        let dir = app
+            .path()
+            .data_dir()
+            .map_err(|e| e.to_string())?
+            .join("jilseo")
+            .join("partitions")
+            .join(service_id);
+        std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+        Ok(builder.data_directory(dir))
+    }
+}
+
+/// User-Agent. macOS는 Safari로 고정(Google 로그인 통과). Windows(WebView2)는 기본 Edge UA를 우선 쓰고,
+/// Google이 차단하면 Phase 4에서 Chrome UA 고정으로 전환한다.
+fn apply_user_agent<R: tauri::Runtime>(builder: WebviewBuilder<R>) -> WebviewBuilder<R> {
+    #[cfg(target_os = "macos")]
+    {
+        builder.user_agent(SAFARI_USER_AGENT)
+    }
+    #[cfg(not(target_os = "macos"))]
+    {
+        builder
     }
 }
 
@@ -93,11 +133,11 @@ pub fn create_panel(
     let parsed = url.parse().map_err(|e| format!("invalid url {url}: {e}"))?;
 
     let builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed))
-        .data_store_identifier(data_store_id_for(&service_id))
-        .user_agent(SAFARI_USER_AGENT)
         .initialization_script(PANEL_INIT_SCRIPT)
         .on_new_window(popup_policy)
         .zoom_hotkeys_enabled(true);
+    let builder = apply_session_partition(&app, builder, &service_id)?;
+    let builder = apply_user_agent(builder);
 
     window
         .add_child(
