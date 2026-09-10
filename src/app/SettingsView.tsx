@@ -4,6 +4,18 @@ import { invoke } from "@tauri-apps/api/core";
 import { useCloud } from "../store/cloud";
 import { useStage } from "../store/stage";
 
+const input = "rounded border border-white/15 bg-white/5 px-2 py-1.5 text-sm text-white/90 outline-none focus:border-white/40";
+
+/** 렌더 함수 밖에 정의해야 한다 — 안에서 정의하면 매 렌더마다 새 컴포넌트로 취급되어 입력창이 리마운트되고 포커스가 빠진다 */
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="flex flex-col gap-1 text-xs text-white/50">
+      {label}
+      {children}
+    </label>
+  );
+}
+
 /** 스테이지를 대체하는 전체 화면 설정 (오버레이는 네이티브 webview 아래에 깔리므로) */
 export function SettingsView({ onClose }: { onClose: () => void }) {
   const supabase = useStage((s) => s.supabase);
@@ -22,13 +34,6 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
     await cloud.init();
   };
 
-  const Field = ({ label, children }: { label: string; children: React.ReactNode }) => (
-    <label className="flex flex-col gap-1 text-xs text-white/50">
-      {label}
-      {children}
-    </label>
-  );
-  const input = "rounded border border-white/15 bg-white/5 px-2 py-1.5 text-sm text-white/90 outline-none focus:border-white/40";
 
   return (
     <main className="flex min-h-0 flex-1 justify-center overflow-y-auto p-6">
@@ -78,10 +83,23 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
             ) : (
               <div className="flex items-end gap-2">
                 <Field label="이메일">
-                  <input value={email} onChange={(e) => setEmail(e.target.value)} className={input} />
+                  <input
+                    type="email"
+                    autoComplete="username"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    className={input}
+                  />
                 </Field>
                 <Field label="비밀번호">
-                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} className={input} />
+                  <input
+                    type="password"
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && email && password && void cloud.signIn(email, password)}
+                    className={input}
+                  />
                 </Field>
                 <button
                   onClick={() => void cloud.signIn(email, password)}
