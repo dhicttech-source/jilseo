@@ -19,11 +19,11 @@ function reportFatal(where: string, err: unknown) {
     invoke("write_store", { name: "dev_results", value: { id: "fatal", type: where, ok: false, result: { error: msg }, finished: Date.now() } }).catch(() => {});
   }
 }
-// DIAG heartbeat (개발 빌드 전용): UI 페이지 생존/언로드 추적. dev_results.json에 id "diag"로 기록
+// 개발 빌드 전용 하트비트: UI 페이지 생존/언로드 추적 → dev_heartbeat.json (하네스 결과 파일과 분리)
 if (import.meta.env.DEV) {
   const mark = (kind: string) =>
     invoke("write_store", {
-      name: "dev_results",
+      name: "dev_heartbeat",
       value: { id: "diag", kind, perf: Math.round(performance.now()), t: Date.now(), vis: document.visibilityState },
     }).catch(() => {});
   setInterval(() => mark("hb"), 1000);

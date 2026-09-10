@@ -36,9 +36,19 @@ export const insertTextJs = (inputSel: string, text: string) => `(() => {
     el.dispatchEvent(new Event('input', { bubbles: true }));
   } else {
     document.execCommand('selectAll', false);
-    const ok = document.execCommand('insertText', false, t);
-    if (!ok || !(el.innerText || '').trim()) {
-      // execCommand 실패 시 InputEvent 폴백
+    document.execCommand('insertText', false, t);
+    let now = (el.innerText || '').trim();
+    if (!now.includes(t.slice(0, 20))) {
+      // Lexical 계열 에디터(Perplexity)는 execCommand를 무시 → paste 이벤트로 삽입
+      try {
+        const dt = new DataTransfer();
+        dt.setData('text/plain', t);
+        el.dispatchEvent(new ClipboardEvent('paste', { bubbles: true, cancelable: true, clipboardData: dt }));
+      } catch (e) { /* 다음 폴백 */ }
+      now = (el.innerText || '').trim();
+    }
+    if (!now.includes(t.slice(0, 20))) {
+      // 마지막 폴백: 직접 주입 + input 이벤트
       el.textContent = t;
       el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: t }));
     }

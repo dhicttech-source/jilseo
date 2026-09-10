@@ -4,9 +4,11 @@
   "url": "https://www.perplexity.ai",
   "partition": "persist:perplexity",
   "selectors": {
-    "input": "TODO(selector)",
-    "send": "TODO(selector)",
-    "response": "TODO(selector)"
+    "input": "#ask-input",
+    "send": "button[aria-label=\"제출\"], button[aria-label=\"Submit\"]",
+    "response": "[class*=\"prose\"], .markdown-content, [data-testid*=\"answer\"]",
+    "fileInput": "input[type=\"file\"]",
+    "fileMenu": "button[aria-label=\"파일 또는 도구 추가\"], button[aria-label*=\"Attach\"]"
   },
-  "verified": "미실측 — 로그인 후 실측 필요. TODO(selector)"
+  "verified": "2026-09-10 라이브 DOM 실측: input(#ask-input, paste 이벤트로 삽입)·send(aria 제출)·fileInput. response는 첫 Broadcast 후 확인 필요"
 }

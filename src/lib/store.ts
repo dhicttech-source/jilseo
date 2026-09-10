@@ -9,7 +9,8 @@ export type StoreName =
   | "notes_cache"
   | "favorites"
   | "dev_commands"
-  | "dev_results";
+  | "dev_results"
+  | "dev_heartbeat";
 
 export const readStore = <T>(name: StoreName) => invoke<T | null>("read_store", { name });
 export const writeStore = (name: StoreName, value: unknown) => invoke<void>("write_store", { name, value });
