@@ -46,11 +46,13 @@ export default function App() {
   useEffect(() => {
     void (async () => {
       await init();
-      await useWorkstations.getState().load();
-      await useFavorites.getState().load();
-      await useCloud.getState().init();
-      await useLibrary.getState().load();
       startDevHarness();
+      {
+        await useWorkstations.getState().load();
+        await useFavorites.getState().load();
+        await useCloud.getState().init();
+        await useLibrary.getState().load();
+      }
     })();
   }, [init]);
 

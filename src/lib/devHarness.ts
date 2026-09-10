@@ -102,7 +102,22 @@ async function tick() {
   running = false;
 }
 
+declare global {
+  interface Window {
+    __jilseoHarnessTimer?: number;
+  }
+}
+
+/** HMR로 모듈이 교체되어도 루프는 하나만 유지한다 (이중 실행 시 옛 코드가 명령을 가로챔) */
 export function startDevHarness() {
   if (!import.meta.env.DEV) return;
-  setInterval(() => void tick(), 1500);
+  if (window.__jilseoHarnessTimer) clearInterval(window.__jilseoHarnessTimer);
+  window.__jilseoHarnessTimer = window.setInterval(() => void tick(), 1500);
+}
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => {
+    if (window.__jilseoHarnessTimer) clearInterval(window.__jilseoHarnessTimer);
+    window.__jilseoHarnessTimer = undefined;
+  });
 }

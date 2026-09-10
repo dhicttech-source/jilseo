@@ -22,6 +22,11 @@ export interface Attachment {
 
 export const isBroadcastTarget = (d: ServiceDef) => d.kind !== "web";
 
+export interface ResponseSnapshot {
+  count: number;
+  text: string;
+}
+
 export const isTodoSelector = (s: string | undefined) => !s || s.startsWith("TODO");
 
 export interface ProbeResult {
@@ -61,12 +66,27 @@ export class ServiceAdapter {
     return r.method ?? "unknown";
   }
 
-  /** 응답 DOM이 3초간 변하지 않으면 done. cb는 변화가 있을 때만 호출. */
+  /** 전송 직전의 응답 DOM 스냅샷. 기존 대화의 마지막 응답을 새 응답으로 오인하지 않기 위한 기준점. */
+  async snapshotResponse(): Promise<ResponseSnapshot> {
+    const sel = this.def.selectors.response;
+    if (isTodoSelector(sel)) return { count: 0, text: "" };
+    try {
+      const r = await evalInPanel<{ count: number; text: string }>(this.id, readResponseJs(sel), 3000);
+      return { count: r.count, text: r.text };
+    } catch {
+      return { count: 0, text: "" };
+    }
+  }
+
+  /**
+   * 응답 관찰. baseline(전송 전 스냅샷)과 다른 새 응답이 나타난 뒤 3초간 변화가 없으면 done.
+   * cb는 변화가 있을 때만 호출.
+   */
   observeResponse(
     cb: (text: string, done: boolean) => void,
-    opts: { quietMs?: number; pollMs?: number; maxMs?: number; signal?: AbortSignal } = {},
+    opts: { quietMs?: number; pollMs?: number; maxMs?: number; signal?: AbortSignal; baseline?: ResponseSnapshot } = {},
   ): Promise<string> {
-    const { quietMs = 3000, pollMs = 700, maxMs = 180_000, signal } = opts;
+    const { quietMs = 3000, pollMs = 700, maxMs = 180_000, signal, baseline = { count: 0, text: "" } } = opts;
     const sel = this.def.selectors.response;
     if (isTodoSelector(sel)) return Promise.resolve("");
     return new Promise((resolve) => {
@@ -74,6 +94,8 @@ export class ServiceAdapter {
       let last = "";
       let lastChange = Date.now();
       let seen = false;
+      const isNew = (r: { count: number; text: string }) =>
+        r.text.length > 0 && (r.count > baseline.count || r.text !== baseline.text);
       const tick = async () => {
         if (signal?.aborted) return resolve(last);
         try {
@@ -82,10 +104,12 @@ export class ServiceAdapter {
             readResponseJs(sel),
             3000,
           );
-          if (r.text !== last) {
+          if (!isNew(r)) {
+            // 아직 새 응답이 없음(기존 응답 그대로 또는 빈 자리표시자)
+          } else if (r.text !== last) {
             last = r.text;
             lastChange = Date.now();
-            seen = r.length > 0;
+            seen = true;
             cb(last, false);
           } else if (seen && Date.now() - lastChange >= quietMs) {
             cb(last, true);

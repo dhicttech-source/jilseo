@@ -192,3 +192,49 @@ pub fn navigate_panel(app: AppHandle, service_id: String, url: String) -> Result
     let parsed: Url = url.parse().map_err(|e| format!("invalid url {url}: {e}"))?;
     webview.navigate(parsed).map_err(|e| e.to_string())
 }
+
+/// 진단용: 모든 webview의 라벨과 현재 URL
+#[tauri::command]
+pub fn list_webviews(app: AppHandle) -> Vec<(String, String)> {
+    app.webviews()
+        .iter()
+        .map(|(label, wv)| (label.clone(), wv.url().map(|u| u.to_string()).unwrap_or_else(|e| format!("err: {e}"))))
+        .collect()
+}
+
+/// UI webview를 다시 로드한다 (개발·복구용)
+#[tauri::command]
+pub fn reload_ui(app: AppHandle) -> Result<(), String> {
+    let ui = app.get_webview("ui").ok_or("ui webview not found")?;
+    ui.reload().map_err(|e| e.to_string())
+}
+
+/// 개발 빌드 전용 감시 스레드: 3초마다 모든 webview의 URL을 `dev_webviews.json`에 기록하고,
+/// `dev_reload_ui` 파일이 있으면 UI webview를 리로드한다. UI가 죽어도 밖에서 진단·복구할 수 있는 통로.
+#[cfg(debug_assertions)]
+pub fn spawn_dev_watch(app: AppHandle) {
+    use std::{fs, thread, time::Duration};
+    let Ok(dir) = app.path().data_dir().map(|d| d.join("jilseo")) else { return };
+    thread::spawn(move || loop {
+        thread::sleep(Duration::from_secs(3));
+        let list: Vec<serde_json::Value> = app
+            .webviews()
+            .iter()
+            .map(|(label, wv)| {
+                serde_json::json!({
+                    "label": label,
+                    "url": wv.url().map(|u| u.to_string()).unwrap_or_else(|e| format!("err: {e}")),
+                })
+            })
+            .collect();
+        let payload = serde_json::json!({ "at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0), "webviews": list });
+        let _ = fs::write(dir.join("dev_webviews.json"), payload.to_string());
+        let flag = dir.join("dev_reload_ui");
+        if flag.exists() {
+            let _ = fs::remove_file(&flag);
+            if let Some(ui) = app.get_webview("ui") {
+                let _ = ui.reload();
+            }
+        }
+    });
+}

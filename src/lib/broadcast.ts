@@ -1,4 +1,11 @@
-import { ServiceAdapter, broadcastText, isBroadcastTarget, type Attachment, type ServiceDef } from "../adapters";
+import {
+  ServiceAdapter,
+  broadcastText,
+  isBroadcastTarget,
+  type Attachment,
+  type ResponseSnapshot,
+  type ServiceDef,
+} from "../adapters";
 import { htmlToMarkdown } from "./markdown";
 import { insertOrQueue } from "./supabase";
 import { useAttachment } from "../store/attachment";
@@ -31,7 +38,11 @@ export function runBroadcast(
 
   const adapters = defs.map((d) => new ServiceAdapter(d));
   const t0 = performance.now();
-  const sentPromise = broadcastText(body, adapters, (id, phase, detail) => setStatus(id, phase, detail), attachment);
+  // 전송 전 스냅샷: 기존 대화의 마지막 응답을 새 응답으로 오인하지 않기 위해
+  const baselines = new Map<string, ResponseSnapshot>();
+  const sentPromise = Promise.all(adapters.map(async (a) => baselines.set(a.id, await a.snapshotResponse()))).then(() =>
+    broadcastText(body, adapters, (id, phase, detail) => setStatus(id, phase, detail), attachment),
+  );
   if (attachment) useAttachment.getState().set(null); // 첨부는 1회 전송 후 해제
 
   const outcome: BroadcastOutcome = {
@@ -46,9 +57,12 @@ export function runBroadcast(
         sent.map(async (a) => {
           setStatus(a.id, "responding");
           const text = await a
-            .observeResponse((_t, done) => {
-              if (done) setStatus(a.id, "done");
-            })
+            .observeResponse(
+              (_t, done) => {
+                if (done) setStatus(a.id, "done");
+              },
+              { baseline: baselines.get(a.id) },
+            )
             .catch(() => "");
           // 렌더링 HTML → Markdown (Phase 3). 실패 시 innerText 그대로.
           const html = await a.readResponseHtml().catch(() => "");

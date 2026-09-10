@@ -24,6 +24,8 @@ pub fn run() {
                 LogicalPosition::new(0.0, 0.0),
                 LogicalSize::new(size.width, size.height),
             )?;
+            #[cfg(debug_assertions)]
+            webviews::spawn_dev_watch(app.handle().clone());
             Ok(())
         })
         .invoke_handler(tauri::generate_handler![
@@ -34,6 +36,8 @@ pub fn run() {
             webviews::eval_in_panel,
             webviews::set_panel_visible,
             webviews::navigate_panel,
+            webviews::list_webviews,
+            webviews::reload_ui,
             storage::services_dir,
             storage::load_services,
             storage::read_settings,
