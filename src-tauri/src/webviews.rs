@@ -3,7 +3,8 @@
 
 use serde::Deserialize;
 use tauri::{
-    webview::WebviewBuilder, AppHandle, LogicalPosition, LogicalSize, Manager, WebviewUrl,
+    webview::{NewWindowFeatures, NewWindowResponse, WebviewBuilder},
+    AppHandle, LogicalPosition, LogicalSize, Manager, Url, WebviewUrl,
 };
 
 /// Google 로그인·Cloudflare 통과율을 높이기 위해 Safari 최신 UA로 고정한다.
@@ -23,6 +24,17 @@ pub struct Rect {
 pub struct PanelLayout {
     pub service_id: String,
     pub rect: Rect,
+}
+
+/// OAuth 로그인(Google 등)은 `window.open` 팝업으로 진행되는 경우가 많다.
+/// wry는 핸들러가 없으면 팝업을 조용히 거부하므로, https 팝업만 허용한다.
+/// `Allow`는 호출한 webview와 같은 쿠키 저장소를 공유하는 네이티브 창을 연다.
+fn popup_policy(url: Url, _features: NewWindowFeatures) -> NewWindowResponse<tauri::Wry> {
+    if url.scheme() == "https" {
+        NewWindowResponse::Allow
+    } else {
+        NewWindowResponse::Deny
+    }
 }
 
 fn panel_label(service_id: &str) -> String {
@@ -67,6 +79,7 @@ pub fn create_panel(
     let builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed))
         .data_store_identifier(data_store_id_for(&service_id))
         .user_agent(SAFARI_USER_AGENT)
+        .on_new_window(popup_policy)
         .zoom_hotkeys_enabled(true);
 
     window

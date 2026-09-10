@@ -66,6 +66,21 @@ npm run tauri dev
 - 해결: `src/lib/panels.ts` `measureViewportInset()` — `window.innerSize()/scaleFactor − document.documentElement.clientHeight`를
   y 보정값으로 사용. 실측 inset=32. 리사이즈 때마다 재측정하므로 다른 맥/해상도에서도 자가 보정.
 
-### 2. Tauri multiwebview 안정성
+### 2. 패스키(WebAuthn) 로그인 불가 — WKWebView 구조적 한계 (우회: 비밀번호 로그인)
+- 증상 (2026-09-10 사용자 1차 시도): ChatGPT·Gemini 모두 Google 계정 로그인 단계에서 패스키 요구.
+  ChatGPT는 "블루투스가 켜져 있고 기기가 가까이 있는지 확인" 오류, Gemini는 "패스키를 사용하여 본인임을 확인" 화면에서 진행 불가.
+- 원인: WKWebView의 WebAuthn은 Apple 승인 브라우저 entitlement(`com.apple.developer.web-browser`) 또는
+  associated domains가 있는 앱에서만 동작. ad-hoc 서명 개인 앱은 해당 없음 → Touch ID·휴대폰 QR(hybrid) 모두 실패.
+- Electron(Chromium)도 Touch ID 패스키가 Chrome 전용 계층이라 동일하게 불가 → **전환 사유 아님**.
+- 우회: 패스키 화면의 "다른 방법 시도" → 비밀번호 입력(+2단계 인증 코드). Google 계정에 "가능하면 비밀번호 건너뛰기"가 켜져 있으면 끈다.
+  세션은 파티션에 저장되므로 최초 1회만 필요.
+
+### 3. Claude "로그인 중 오류" — window.open 팝업 차단 (해결)
+- 증상: claude.ai "Google로 계속하기" 클릭 → "로그인 중 오류가 발생했습니다".
+- 원인: claude.ai의 OAuth는 `window.open` 팝업. wry는 new-window 핸들러가 없으면 팝업을 조용히 거부.
+- 해결: `webviews.rs` `popup_policy` — https 팝업은 `NewWindowResponse::Allow`(호출 webview와 쿠키 저장소 공유), 그 외 Deny.
+- 남은 제약: wry가 `window.close()`(webViewDidClose)를 처리하지 않아 OAuth 완료 후 팝업을 수동으로 닫아야 할 수 있음.
+
+### 4. Tauri multiwebview 안정성
 - `unstable` feature + `Window::add_child` 3개 동시 생성·배치 정상. 크래시 없음.
 - 원격 URL webview는 capability를 주지 않아 IPC 차단 상태 (의도된 격리).
