@@ -1,0 +1,11 @@
+{
+  "id": "claude",
+  "name": "Claude",
+  "url": "https://claude.ai",
+  "partition": "persist:claude",
+  "selectors": {
+    "input": "TODO(selector)",
+    "send": "TODO(selector)",
+    "response": "TODO(selector)"
+  }
+}

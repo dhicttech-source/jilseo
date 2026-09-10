@@ -1,10 +1,12 @@
 {
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "default",
-  "description": "Capability for the main window",
-  "windows": ["main"],
+  "description": "앱 UI webview(ui)에만 IPC 허용. 서비스 패널 webview(panel-*)는 IPC 차단.",
+  "webviews": ["ui"],
   "permissions": [
     "core:default",
+    "core:window:allow-inner-size",
+    "core:window:allow-scale-factor",
     "opener:default"
   ]
 }

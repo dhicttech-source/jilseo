@@ -1,0 +1,11 @@
+{
+  "id": "grok",
+  "name": "Grok",
+  "url": "https://grok.com",
+  "partition": "persist:grok",
+  "selectors": {
+    "input": "TODO(selector)",
+    "send": "TODO(selector)",
+    "response": "TODO(selector)"
+  }
+}
