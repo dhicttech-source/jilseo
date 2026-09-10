@@ -44,7 +44,8 @@
 ## 6. 기타
 - Supabase keepalive: launchd `com.dhict.jilseo.keepalive` 등록, 매일 09:15 REST 호출. 첫 실행 http 200 (`~/Library/Application Support/jilseo/keepalive.log`)
 - Phase 4 준비: 세션 파티션·UA를 플랫폼별 함수로 분리, nsis 타깃 추가. macOS 컴파일 확인. Windows 빌드는 Windows 머신 필요
-- 새 dmg: `release/jilseo_0.1.0_aarch64.dmg` (Phase 3 포함, 안내문 동봉)
+- 새 dmg: `release/jilseo_0.1.0_aarch64.dmg` (HEAD a87aaa8 기준, Phase 3·품질 수정 포함, 안내문 동봉). sha256 8e451341…7f05aa
+- 개발용 앱은 종료해 두었음. 복귀 후 `cd ~/dev/jilseo && npm run tauri dev`로 실행
 
 ## 사용자 확인 필요
 - Grok · Perplexity 로그인 후 셀렉터 실측
