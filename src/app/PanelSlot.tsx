@@ -6,7 +6,14 @@ import { useCloud } from "../store/cloud";
 import { useStage } from "../store/stage";
 import { useWorkstations } from "../store/workstations";
 
-const SELECTION_JS = `JSON.stringify({ text: String(window.getSelection ? window.getSelection().toString() : '') })`;
+/** 현재 선택 → 없으면 init script가 기록해 둔 최근 선택(60초 이내) */
+const SELECTION_JS = `(() => {
+  const live = String(window.getSelection ? window.getSelection().toString() : '');
+  if (live.trim()) return JSON.stringify({ text: live, source: 'live' });
+  const last = window.__jilseoSel;
+  if (last && Date.now() - last.at < 60000) return JSON.stringify({ text: last.text, source: 'last' });
+  return JSON.stringify({ text: '' });
+})()`;
 
 const PHASE_LABEL: Record<string, string> = {
   creating: "생성 중",
@@ -48,7 +55,11 @@ export function PanelSlot({ service }: { service: ServiceDef }) {
   const saveNote = async () => {
     try {
       const { text } = await evalInPanel<{ text: string }>(service.id, SELECTION_JS, 3000);
-      if (!text.trim()) return setNote("선택된 텍스트 없음");
+      if (!text.trim()) {
+        setNote("선택된 텍스트 없음 — 패널에서 드래그로 선택한 뒤 눌러주세요");
+        setTimeout(() => setNote(null), 4000);
+        return;
+      }
       const url = await panelUrl(service.id).catch(() => null);
       const user = useCloud.getState().user;
       const res = await insertOrQueue(useCloud.getState().config(), "notes", {

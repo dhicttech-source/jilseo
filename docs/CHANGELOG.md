@@ -2,7 +2,7 @@
 
 ## [Unreleased]
 
-## Phase 2 — 2026-09-10 (구현 완료, Supabase 연동 검증 대기)
+## Phase 2 — 2026-09-10 (Supabase 연동 검증: 로그인·프롬프트·비교 기록 OK, 메모 재검증 중)
 
 ### Added
 - 워크스테이션: 현재 패널 구성 + 각 패널 대화 URL 저장/전환/덮어쓰기/삭제 (`workstations.json`)
@@ -13,6 +13,15 @@
 - 비교 기록: Broadcast 1회 = 1레코드, 모든 패널 응답 완료 후 저장, device 필드
 - 설정 화면(Supabase URL·anon key·로그인·기기 이름), 첫 실행 온보딩(패스키·팝업·셀렉터 안내)
 - dmg: 배경 이미지에 설치 3단계, `처음 실행하는 법.txt` 동봉 (`npm run dmg` → `scripts/finish-dmg.sh`)
+
+### Verified (2026-09-10 11:10)
+- Supabase Free 프로젝트 `jilseo`(Seoul) 생성, `schema.sql` 실행, 이메일 로그인 성공 (세션 `session.json` 보관)
+- prompts 1건, comparisons 1건(프롬프트 "주간 날씨", 응답 3개) 클라우드 저장 확인. 큐 0건
+- 비교 기록은 전송된 패널 전부의 응답이 끝난 뒤 저장됨 (Claude 도구 사용으로 지연 → 저장 확인)
+
+### Fixed
+- 설정 화면 입력창이 한 글자마다 포커스를 잃던 문제 (렌더 함수 안에서 정의한 `Field` 컴포넌트를 바깥으로 이동)
+- 메모: 현재 선택이 비어 있으면 최근 60초 내 선택을 사용하도록 폴백 (init script 연동 예정)
 
 ## Phase 1 — 2026-09-10 (핵심 완료. 남은 검증: 셀렉터 JSON 수정→재시작 반영, 최대화)
 
