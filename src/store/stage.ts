@@ -41,6 +41,8 @@ interface Settings {
   device?: string;
   onboarded?: boolean;
   webSlots?: WebSlot[];
+  /** 파일 전송 뒤 afterFileBroadcast=new_chat 서비스를 새 채팅으로 이동 (기본 켜짐) */
+  newChatAfterFile?: boolean;
 }
 
 /** 웹슬롯 → ServiceDef (셀렉터 없음, Broadcast 제외) */
@@ -93,8 +95,10 @@ interface StageState {
   /** JSON 서비스 정의 (웹슬롯 제외) */
   baseServices: ServiceDef[];
   webSlots: WebSlot[];
+  newChatAfterFile: boolean;
 
   init(): Promise<void>;
+  setNewChatAfterFile(v: boolean): void;
   addWebSlot(url: string, name?: string): string | null;
   removeWebSlot(id: string): void;
   applyLayout(stage: string[], columns?: number): void;
@@ -112,8 +116,8 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function persist(get: () => StageState) {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    const { stage, columns, maximized, supabase, device, onboarded, webSlots } = get();
-    const settings: Settings = { version: 1, stage, columns, maximized, supabase, device, onboarded, webSlots };
+    const { stage, columns, maximized, supabase, device, onboarded, webSlots, newChatAfterFile } = get();
+    const settings: Settings = { version: 1, stage, columns, maximized, supabase, device, onboarded, webSlots, newChatAfterFile };
     invoke("write_settings", { settings }).catch(() => {});
   }, 200);
 }
@@ -133,6 +137,7 @@ export const useStage = create<StageState>((set, get) => ({
   onboarded: false,
   baseServices: [],
   webSlots: [],
+  newChatAfterFile: true,
 
   async init() {
     const [svcRes, settings, dir, inset] = await Promise.all([
@@ -162,7 +167,13 @@ export const useStage = create<StageState>((set, get) => ({
       supabase: settings?.supabase ?? null,
       device: settings?.device ?? "mac_studio",
       onboarded: settings?.onboarded ?? false,
+      newChatAfterFile: settings?.newChatAfterFile ?? true,
     });
+  },
+
+  setNewChatAfterFile(v) {
+    set({ newChatAfterFile: v });
+    persist(get);
   },
 
   /** 웹슬롯을 등록하고(없으면) 스테이지에도 올린다. 주의: 두 가지 상태를 함께 바꾼다. */

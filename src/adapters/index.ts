@@ -29,6 +29,8 @@ export interface ServiceDef {
   verified?: string;
   /** "web": 웹슬롯(일반 URL). Broadcast 대상에서 제외 */
   kind?: "ai" | "web";
+  /** 파일을 첨부해 전송한 뒤 응답 수집이 끝나면 새 채팅으로 이동 (ChatGPT: 파일 첨부 대화방에서 이후 응답이 막히는 문제 회피) */
+  afterFileBroadcast?: "new_chat";
 }
 
 export interface Attachment {

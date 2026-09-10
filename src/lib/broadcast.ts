@@ -7,6 +7,7 @@ import {
   type ServiceDef,
 } from "../adapters";
 import { htmlToMarkdown } from "./markdown";
+import { navigatePanel } from "./panels";
 import { saveRow } from "./supabase";
 import { useAttachment } from "../store/attachment";
 import { useCloud } from "../store/cloud";
@@ -72,6 +73,7 @@ export function runBroadcast(
       const cloud = useCloud.getState();
       const saved = await saveRow(cloud.config(), cloud.user, "comparisons", { prompt: body, responses, device });
       void cloud.flush();
+      if (attachment) moveToNewChatAfterFile(sent.map((a) => a.def));
       return { responses, saved };
     }),
   };
@@ -92,4 +94,16 @@ export async function runBroadcastAndWaitSent(text: string, targets?: ServiceDef
   // sent가 채워질 때까지 대기 (completion보다 먼저 끝남)
   while (o.ms === 0 && Object.keys(o.sent).length === 0) await new Promise((r) => setTimeout(r, 50));
   return o;
+}
+
+/** 파일 전송 뒤 새 채팅 이동: 서비스 정의에 afterFileBroadcast=new_chat 이고 설정이 켜진 경우만 */
+function moveToNewChatAfterFile(defs: ServiceDef[]) {
+  const { newChatAfterFile, setStatus } = useStage.getState();
+  if (!newChatAfterFile) return;
+  for (const d of defs) {
+    if (d.afterFileBroadcast !== "new_chat") continue;
+    navigatePanel(d.id, d.url)
+      .then(() => setStatus(d.id, "ready", "새 채팅으로 이동"))
+      .catch(() => {});
+  }
 }

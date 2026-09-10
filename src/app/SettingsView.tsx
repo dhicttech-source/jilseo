@@ -23,6 +23,8 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
   const device = useStage((s) => s.device);
   const setDevice = useStage((s) => s.setDevice);
   const servicesDir = useStage((s) => s.servicesDir);
+  const newChatAfterFile = useStage((s) => s.newChatAfterFile);
+  const setNewChatAfterFile = useStage((s) => s.setNewChatAfterFile);
   const cloud = useCloud();
   const [url, setUrl] = useState(supabase?.url ?? "");
   const [anonKey, setAnonKey] = useState(supabase?.anonKey ?? "");
@@ -129,6 +131,25 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
               <input value={device} onChange={(e) => setDevice(e.target.value)} className={input + " w-32"} />
             </div>
           </Field>
+        </section>
+
+        <section className="flex flex-col gap-3 rounded-lg border border-white/10 p-4">
+          <h2 className="text-sm font-medium text-white/85">Broadcast</h2>
+          <label className="flex items-start gap-2 text-xs text-white/70">
+            <input
+              type="checkbox"
+              checked={newChatAfterFile}
+              onChange={(e) => setNewChatAfterFile(e.target.checked)}
+              className="mt-0.5"
+            />
+            <span>
+              파일 전송 뒤 새 채팅으로 이동 (ChatGPT)
+              <span className="block text-white/40">
+                ChatGPT는 파일을 첨부한 대화방에서 이후 응답이 생성되지 않는 경우가 있어, 응답 수집이 끝나면 패널을 새 채팅으로 옮깁니다.
+                서비스 JSON의 <code>afterFileBroadcast</code>로 대상 서비스를 정합니다.
+              </span>
+            </span>
+          </label>
         </section>
 
         <section className="flex flex-col gap-2 rounded-lg border border-white/10 p-4">
