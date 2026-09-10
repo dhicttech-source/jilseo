@@ -20,11 +20,19 @@ export interface PanelStatus {
   at: number;
 }
 
+export interface SupabaseSettings {
+  url: string;
+  anonKey: string;
+}
+
 interface Settings {
   version: 1;
   stage: string[];
   columns: number;
   maximized: string | null;
+  supabase?: SupabaseSettings | null;
+  device?: string;
+  onboarded?: boolean;
 }
 
 const DEFAULT_STAGE = ["chatgpt", "claude", "gemini"];
@@ -40,8 +48,15 @@ interface StageState {
   maximized: string | null;
   insetTop: number;
   status: Record<string, PanelStatus>;
+  supabase: SupabaseSettings | null;
+  device: string;
+  onboarded: boolean;
 
   init(): Promise<void>;
+  applyLayout(stage: string[], columns?: number): void;
+  setSupabase(cfg: SupabaseSettings | null): void;
+  setDevice(name: string): void;
+  setOnboarded(v: boolean): void;
   remeasureInset(): Promise<void>;
   toggleStage(id: string): void;
   setMaximized(id: string | null): void;
@@ -53,8 +68,8 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function persist(get: () => StageState) {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    const { stage, columns, maximized } = get();
-    const settings: Settings = { version: 1, stage, columns, maximized };
+    const { stage, columns, maximized, supabase, device, onboarded } = get();
+    const settings: Settings = { version: 1, stage, columns, maximized, supabase, device, onboarded };
     invoke("write_settings", { settings }).catch(() => {});
   }, 200);
 }
@@ -69,6 +84,9 @@ export const useStage = create<StageState>((set, get) => ({
   maximized: null,
   insetTop: 0,
   status: {},
+  supabase: null,
+  device: "mac_studio",
+  onboarded: false,
 
   async init() {
     const [svcRes, settings, dir, inset] = await Promise.all([
@@ -92,7 +110,35 @@ export const useStage = create<StageState>((set, get) => ({
       columns: Math.min(4, Math.max(1, settings?.columns ?? 3)),
       maximized,
       insetTop: inset.top,
+      supabase: settings?.supabase ?? null,
+      device: settings?.device ?? "mac_studio",
+      onboarded: settings?.onboarded ?? false,
     });
+  },
+
+  applyLayout(stage, columns) {
+    const known = new Set(get().services.map((s) => s.id));
+    set({
+      stage: stage.filter((id) => known.has(id)).slice(0, MAX_PANELS),
+      columns: columns ? Math.min(4, Math.max(1, columns)) : get().columns,
+      maximized: null,
+    });
+    persist(get);
+  },
+
+  setSupabase(cfg) {
+    set({ supabase: cfg });
+    persist(get);
+  },
+
+  setDevice(name) {
+    set({ device: name.trim() || "mac" });
+    persist(get);
+  },
+
+  setOnboarded(v) {
+    set({ onboarded: v });
+    persist(get);
   },
 
   async remeasureInset() {

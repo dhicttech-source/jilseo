@@ -1,9 +1,16 @@
 import { useRef, useState } from "react";
 import { ServiceAdapter, broadcastText } from "../adapters";
+import { insertOrQueue } from "../lib/supabase";
+import { useCloud } from "../store/cloud";
+import { useDraft } from "../store/draft";
+import { useLibrary } from "../store/library";
 import { useStage } from "../store/stage";
 
 export function BroadcastBar() {
-  const [text, setText] = useState("");
+  const text = useDraft((s) => s.text);
+  const setText = useDraft((s) => s.set);
+  const libraryOpen = useLibrary((s) => s.open);
+  const toggleLibrary = useLibrary((s) => s.toggle);
   const [busy, setBusy] = useState(false);
   const [summary, setSummary] = useState<string | null>(null);
   const taRef = useRef<HTMLTextAreaElement | null>(null);
@@ -28,19 +35,47 @@ export function BroadcastBar() {
     setSummary(`${ok}/${adapters.length} 전송 · ${ms}ms`);
     setBusy(false);
     if (ok > 0) setText("");
-    // 전송된 패널은 응답 관찰 (완료 배지용). 실패 격리: 각 패널 독립.
-    for (const a of adapters) {
-      if (!results[a.id]?.ok) continue;
-      setStatus(a.id, "responding");
-      a.observeResponse((_t, done) => {
-        if (done) setStatus(a.id, "done");
-      }).catch(() => {});
-    }
     taRef.current?.focus();
+    if (ok === 0) return;
+
+    // 전송된 패널의 응답을 관찰(완료 배지) → 모두 끝나면 비교 기록 1건 저장. 각 패널 독립.
+    const sent = adapters.filter((a) => results[a.id]?.ok);
+    const responses: Record<string, string> = {};
+    await Promise.all(
+      sent.map(async (a) => {
+        setStatus(a.id, "responding");
+        responses[a.id] = await a
+          .observeResponse((_t, done) => {
+            if (done) setStatus(a.id, "done");
+          })
+          .catch(() => "");
+      }),
+    );
+    const cloud = useCloud.getState();
+    const user = cloud.user;
+    const res = await insertOrQueue(cloud.config(), "comparisons", {
+      prompt: body,
+      responses,
+      device: useStage.getState().device,
+      created_at: new Date().toISOString(),
+      ...(user ? { user_id: user.id } : {}),
+    });
+    setSummary((s) => `${s ?? ""} · 비교 기록 ${res === "saved" ? "저장" : "큐"}`);
+    void cloud.flush();
   };
 
   return (
     <div className="flex shrink-0 items-end gap-2 border-t border-white/10 px-3 py-2">
+      <button
+        onClick={toggleLibrary}
+        title="프롬프트 라이브러리"
+        className={
+          "h-[44px] shrink-0 rounded-lg border px-3 text-sm " +
+          (libraryOpen ? "border-white/30 bg-white/15 text-white/90" : "border-white/10 text-white/50 hover:bg-white/10")
+        }
+      >
+        📚
+      </button>
       <textarea
         ref={taRef}
         value={text}

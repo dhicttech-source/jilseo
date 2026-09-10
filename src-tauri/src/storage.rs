@@ -107,3 +107,39 @@ pub fn write_diagnostics(app: AppHandle, report: Value) -> Result<String, String
     fs::write(&path, s).map_err(|e| e.to_string())?;
     Ok(path.to_string_lossy().into_owned())
 }
+
+/// 범용 JSON 스토어. 이름은 화이트리스트로 제한한다.
+const STORE_NAMES: &[&str] = &["workstations", "presets", "session", "queue", "prompts_cache", "notes_cache"];
+
+fn store_path(app: &AppHandle, name: &str) -> Result<PathBuf, String> {
+    if !STORE_NAMES.contains(&name) {
+        return Err(format!("unknown store: {name}"));
+    }
+    Ok(app_dir(app)?.join(format!("{name}.json")))
+}
+
+#[tauri::command]
+pub fn read_store(app: AppHandle, name: String) -> Result<Value, String> {
+    let path = store_path(&app, &name)?;
+    if !path.exists() {
+        return Ok(Value::Null);
+    }
+    let s = fs::read_to_string(&path).map_err(|e| e.to_string())?;
+    serde_json::from_str(&s).map_err(|e| e.to_string())
+}
+
+#[tauri::command]
+pub fn write_store(app: AppHandle, name: String, value: Value) -> Result<(), String> {
+    let path = store_path(&app, &name)?;
+    let s = serde_json::to_string_pretty(&value).map_err(|e| e.to_string())?;
+    // 원자적 쓰기: 임시 파일 후 rename
+    let tmp = path.with_extension("json.tmp");
+    fs::write(&tmp, s).map_err(|e| e.to_string())?;
+    fs::rename(&tmp, &path).map_err(|e| e.to_string())
+}
+
+/// 앱 데이터 폴더 경로 (온보딩 안내용)
+#[tauri::command]
+pub fn app_data_dir(app: AppHandle) -> Result<String, String> {
+    Ok(app_dir(&app)?.to_string_lossy().into_owned())
+}

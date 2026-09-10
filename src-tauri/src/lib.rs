@@ -39,6 +39,9 @@ pub fn run() {
             storage::read_settings,
             storage::write_settings,
             storage::write_diagnostics,
+            storage::read_store,
+            storage::write_store,
+            storage::app_data_dir,
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

@@ -1,7 +1,12 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ServiceDef } from "../adapters";
-import { createPanel, layoutPanels, rectOf, setPanelVisible } from "../lib/panels";
+import { createPanel, evalInPanel, layoutPanels, navigatePanel, panelUrl, rectOf, setPanelVisible } from "../lib/panels";
+import { insertOrQueue } from "../lib/supabase";
+import { useCloud } from "../store/cloud";
 import { useStage } from "../store/stage";
+import { useWorkstations } from "../store/workstations";
+
+const SELECTION_JS = `JSON.stringify({ text: String(window.getSelection ? window.getSelection().toString() : '') })`;
 
 const PHASE_LABEL: Record<string, string> = {
   creating: "생성 중",
@@ -37,6 +42,29 @@ export function PanelSlot({ service }: { service: ServiceDef }) {
   const setStatus = useStage((s) => s.setStatus);
   const toggleStage = useStage((s) => s.toggleStage);
   const isMax = maximized === service.id;
+  const [note, setNote] = useState<string | null>(null);
+
+  /** 패널 내 선택 텍스트 → 메모 (서비스·대화 URL·시각 자동) */
+  const saveNote = async () => {
+    try {
+      const { text } = await evalInPanel<{ text: string }>(service.id, SELECTION_JS, 3000);
+      if (!text.trim()) return setNote("선택된 텍스트 없음");
+      const url = await panelUrl(service.id).catch(() => null);
+      const user = useCloud.getState().user;
+      const res = await insertOrQueue(useCloud.getState().config(), "notes", {
+        service_id: service.id,
+        conversation_url: url,
+        content: text,
+        created_at: new Date().toISOString(),
+        ...(user ? { user_id: user.id } : {}),
+      });
+      setNote(res === "saved" ? `메모 저장 (${text.length}자)` : `메모 큐에 저장 (${text.length}자)`);
+      void useCloud.getState().flush();
+    } catch (e) {
+      setNote(`메모 실패: ${String(e).slice(0, 40)}`);
+    }
+    setTimeout(() => setNote(null), 4000);
+  };
 
   useEffect(() => {
     const el = ref.current;
@@ -48,6 +76,9 @@ export function PanelSlot({ service }: { service: ServiceDef }) {
         if (!alive) return;
         await setPanelVisible(service.id, true).catch(() => {});
         await layoutPanels([{ service_id: service.id, rect: rectOf(el, useStage.getState().insetTop) }]).catch(() => {});
+        // 워크스테이션 복원: 이 패널에 예약된 대화 URL이 있으면 이동
+        const pending = useWorkstations.getState().takePendingUrl(service.id);
+        if (pending) await navigatePanel(service.id, pending).catch(() => {});
         setStatus(service.id, "ready");
       })
       .catch((e) => alive && setStatus(service.id, "error", String(e)));
@@ -80,6 +111,14 @@ export function PanelSlot({ service }: { service: ServiceDef }) {
           {phase === "error" && status?.detail ? ` · ${status.detail.slice(0, 60)}` : ""}
         </span>
         <span className="ml-auto flex items-center gap-1">
+          {note && <span className="text-[10px] text-sky-300">{note}</span>}
+          <button
+            className="rounded px-1.5 py-0.5 hover:bg-white/10"
+            title="패널에서 선택한 텍스트를 메모로 저장"
+            onClick={() => void saveNote()}
+          >
+            메모
+          </button>
           <button
             className="rounded px-1.5 py-0.5 hover:bg-white/10"
             title={isMax ? "복귀" : "최대화"}
