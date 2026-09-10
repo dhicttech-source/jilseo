@@ -39,8 +39,8 @@
 
 ### Grok (`grok.json`)
 - 실측일: 2026-09-10 (input `div.tiptap[contenteditable]`, send `button[data-testid="chat-submit"]`, fileInput `input[type=file]`)
-- 특이: 2026-09-10 시점 "나이를 확인해 주세요" 모달이 전송을 막음 → 패널에서 1회 처리 필요. response 셀렉터는 첫 정상 응답 후 실측 필요
-- 결과: [ ] 2 [ ] 3 [ ] 4 (모달 처리 후 재검증)
+- 특이: 최초 접속 시 "나이를 확인해 주세요" 모달이 전송을 막음 → 패널에서 1회 처리(2026-09-10 사용자 처리 완료). `button.click()`이 무시될 수 있어 어댑터가 입력창 비워짐으로 전송을 판정하고 requestSubmit→Enter 폴백. response `div[data-testid="assistant-message"]`
+- 결과 (2026-09-10 테스트 9): [x] 2 [x] 3 [x] 4 (토큰 정답 수집) [ ] 5 [ ] 6 [x] 7 [x] 8 [x] 9
 
 ### Perplexity (`perplexity.json`)
 - 실측일: 2026-09-10 (input `#ask-input` — execCommand 무시, paste 이벤트로 삽입; send `button[aria-label="제출"]`; fileInput `input[type=file]`; fileMenu "파일 또는 도구 추가")
