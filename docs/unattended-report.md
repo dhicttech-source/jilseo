@@ -34,7 +34,9 @@
 - 조치: 이분 탐색용 임시 코드 전부 원복, 스테이지 구성을 사용자 상태(ChatGPT·Claude·Gemini·Perplexity, 2열)로 복구, 앱 재시작.
 - 남은 무인 작업은 UI 불필요 항목만 진행: 코드 품질 점검, Supabase keepalive, Windows 분기(컴파일만), 문서, dmg 빌드.
 
-## 5. 품질 점검 (intent-review)
+## 5. 품질 점검 (intent-review · ai-coding-checklist)
+- 배포 체크리스트: `docs/reviews/deploy-checklist-2026-09-10.md` — 🔴 0 / 🟡 7 / 🔍 3 / ✅ 17 / N/A 9. Git 이력·소스에 키 없음, npm 취약점 0건. `innerHTML` 1곳을 `textContent`로 교체
+- 우선순위: ① Supabase 가입 차단 + 수동 백업 주기(대시보드, 사용자) ② supabase-js fetch 타임아웃(다음 수정) ③ 온보딩에 저장 위치 안내
 - 보고서: `docs/reviews/intent-review-2026-09-10.md` (후보 9건: high 3 / medium 5 / low 1)
 - 적용한 것(동작 불변, 기계적 추출): 클라우드 행 저장 규칙 `saveRow()`로 통합(3곳), 열 수 클램프 `clampColumns()`, 서비스 합성 `composeServices()`, 스테이지 정합성 `sanitizeStage()`, TODO 셀렉터 센티널 상수
 - 남긴 것: `runBroadcast()` 2단계 분리, `broadcastText`/`addWebSlot` 개명 — 동작 변경이라 사용자 확인 후
