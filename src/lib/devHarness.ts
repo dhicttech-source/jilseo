@@ -20,8 +20,11 @@ import type { Attachment } from "../adapters";
 interface Command {
   id: string;
   type: string;
+  /** 클라이언트가 쓴 시각(ms). 60초 넘은 명령은 무시 — 앱 재시작 시 옛 명령이 재실행되는 사고 방지 */
+  at?: number;
   [k: string]: unknown;
 }
+const MAX_COMMAND_AGE_MS = 60_000;
 
 let running = false;
 let lastId: string | null = null;
@@ -87,6 +90,10 @@ async function tick() {
   if (running) return;
   const cmd = await readStore<Command>("dev_commands").catch(() => null);
   if (!cmd || !cmd.id || cmd.id === lastId) return;
+  if (cmd.at && Date.now() - cmd.at > MAX_COMMAND_AGE_MS) {
+    lastId = cmd.id; // 오래된 명령은 소비만 하고 실행하지 않는다
+    return;
+  }
   running = true;
   lastId = cmd.id;
   const started = Date.now();
@@ -112,6 +119,12 @@ declare global {
 export function startDevHarness() {
   if (!import.meta.env.DEV) return;
   if (window.__jilseoHarnessTimer) clearInterval(window.__jilseoHarnessTimer);
+  // 시작 시점에 이미 처리된 명령을 다시 실행하지 않도록 마지막 결과 id를 넘겨받는다
+  void readStore<{ id?: string }>("dev_results")
+    .then((r) => {
+      if (r?.id && r.id !== "diag" && r.id !== "fatal") lastId = r.id;
+    })
+    .catch(() => {});
   window.__jilseoHarnessTimer = window.setInterval(() => void tick(), 1500);
 }
 

@@ -1,7 +1,9 @@
 mod storage;
 mod webviews;
 
-use tauri::{webview::WebviewBuilder, LogicalPosition, LogicalSize, WebviewUrl};
+use tauri::{
+    utils::config::BackgroundThrottlingPolicy, webview::WebviewBuilder, LogicalPosition, LogicalSize, WebviewUrl,
+};
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
@@ -20,7 +22,10 @@ pub fn run() {
             let size = window.inner_size()?.to_logical::<f64>(scale);
 
             window.add_child(
-                WebviewBuilder::new("ui", WebviewUrl::App("index.html".into())).auto_resize(),
+                // 창이 다른 창·잠금 화면에 가려져도 UI 로직(전송·응답 관찰)이 멈추지 않도록 백그라운드 정지 해제 (macOS 14+)
+                WebviewBuilder::new("ui", WebviewUrl::App("index.html".into()))
+                    .auto_resize()
+                    .background_throttling(BackgroundThrottlingPolicy::Disabled),
                 LogicalPosition::new(0.0, 0.0),
                 LogicalSize::new(size.width, size.height),
             )?;

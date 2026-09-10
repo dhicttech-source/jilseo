@@ -47,7 +47,17 @@ export const insertTextJs = (inputSel: string, text: string) => `(() => {
   return JSON.stringify({ ok: now.length > 0, now: now.slice(0, 80) });
 })()`;
 
-/** 전송: 버튼 클릭 우선, 버튼이 없거나 비활성이면 입력창에 Enter */
+/** 전송 버튼이 있고 활성이면 클릭. 비활성이면 { ok:false, reason:'disabled' } (앱이 재시도) */
+export const clickSendJs = (sendSel: string) => `(() => {
+  const btn = ${q(sendSel)};
+  if (!btn) return JSON.stringify({ ok: false, reason: 'missing' });
+  const enabled = !btn.disabled && btn.getAttribute('aria-disabled') !== 'true' && (btn.offsetWidth || btn.offsetHeight);
+  if (!enabled) return JSON.stringify({ ok: false, reason: 'disabled' });
+  btn.click();
+  return JSON.stringify({ ok: true, method: 'click' });
+})()`;
+
+/** 전송: 버튼 클릭 우선, 버튼이 없거나 비활성이면 입력창에 Enter (단발 시도용) */
 export const submitJs = (sendSel: string, inputSel: string) => `(() => {
   const btn = ${q(sendSel)};
   const enabled = btn && !btn.disabled && btn.getAttribute('aria-disabled') !== 'true' && (btn.offsetWidth || btn.offsetHeight);
@@ -133,4 +143,20 @@ export const attachFileJs = (
       return JSON.stringify({ ok: false, reason: 'drop/paste unsupported: ' + String(e2) });
     }
   }
+})()`;
+
+
+/** 요소 클릭 (메뉴 열기 등) */
+export const clickJs = (sel: string) => `(() => {
+  const el = ${q(sel)};
+  if (!el) return JSON.stringify({ ok: false, reason: 'not found: ' + ${JSON.stringify(sel)} });
+  el.click();
+  return JSON.stringify({ ok: true });
+})()`;
+
+/** Escape 키 (열린 메뉴 닫기) */
+export const escapeJs = () => `(() => {
+  document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+  document.dispatchEvent(new KeyboardEvent('keyup', { key: 'Escape', code: 'Escape', keyCode: 27, bubbles: true }));
+  return JSON.stringify({ ok: true });
 })()`;

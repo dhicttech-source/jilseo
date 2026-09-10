@@ -3,6 +3,7 @@
 
 use serde::Deserialize;
 use tauri::{
+    utils::config::BackgroundThrottlingPolicy,
     webview::{NewWindowFeatures, NewWindowResponse, WebviewBuilder},
     AppHandle, LogicalPosition, LogicalSize, Manager, Url, WebviewUrl,
 };
@@ -135,6 +136,8 @@ pub fn create_panel(
     let builder = WebviewBuilder::new(&label, WebviewUrl::External(parsed))
         .initialization_script(PANEL_INIT_SCRIPT)
         .on_new_window(popup_policy)
+        // 가려진 상태에서도 AI 응답 스트리밍·DOM 갱신이 계속되도록 (macOS 14+)
+        .background_throttling(BackgroundThrottlingPolicy::Disabled)
         .zoom_hotkeys_enabled(true);
     let builder = apply_session_partition(&app, builder, &service_id)?;
     let builder = apply_user_agent(builder);
@@ -173,15 +176,16 @@ pub fn destroy_panel(app: AppHandle, service_id: String) -> Result<(), String> {
     Ok(())
 }
 
+/// wry `url()`은 페이지 전환 중 URL이 없으면 panic한다(unwrap). 메인 스레드 panic은 앱 전체를 죽이므로 잡아서 None으로 돌린다.
+fn safe_url(webview: &tauri::Webview) -> Option<String> {
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| webview.url().ok().map(|u| u.to_string())))
+        .ok()
+        .flatten()
+}
+
 #[tauri::command]
 pub fn panel_url(app: AppHandle, service_id: String) -> Result<Option<String>, String> {
-    match app.get_webview(&panel_label(&service_id)) {
-        Some(webview) => webview
-            .url()
-            .map(|u| Some(u.to_string()))
-            .map_err(|e| e.to_string()),
-        None => Ok(None),
-    }
+    Ok(app.get_webview(&panel_label(&service_id)).as_ref().and_then(safe_url))
 }
 
 /// 패널 안에서 JS를 실행하고 결과(JSON 직렬화 문자열)를 돌려준다.
@@ -238,7 +242,7 @@ pub fn navigate_panel(app: AppHandle, service_id: String, url: String) -> Result
 pub fn list_webviews(app: AppHandle) -> Vec<(String, String)> {
     app.webviews()
         .iter()
-        .map(|(label, wv)| (label.clone(), wv.url().map(|u| u.to_string()).unwrap_or_else(|e| format!("err: {e}"))))
+        .map(|(label, wv)| (label.clone(), safe_url(wv).unwrap_or_else(|| "(no url)".into())))
         .collect()
 }
 
@@ -249,8 +253,9 @@ pub fn reload_ui(app: AppHandle) -> Result<(), String> {
     ui.reload().map_err(|e| e.to_string())
 }
 
-/// 개발 빌드 전용 감시 스레드: 3초마다 모든 webview의 URL을 `dev_webviews.json`에 기록하고,
+/// 개발 빌드 전용 감시 스레드: 3초마다 webview 라벨 목록을 `dev_webviews.json`에 기록하고,
 /// `dev_reload_ui` 파일이 있으면 UI webview를 리로드한다. UI가 죽어도 밖에서 진단·복구할 수 있는 통로.
+/// 주의: 여기서 `url()`을 부르면 안 된다 — 페이지 전환 중 wry가 panic해 앱이 죽는다 (2026-09-10 실제 발생).
 #[cfg(debug_assertions)]
 pub fn spawn_dev_watch(app: AppHandle) {
     use std::{fs, thread, time::Duration};
@@ -259,13 +264,8 @@ pub fn spawn_dev_watch(app: AppHandle) {
         thread::sleep(Duration::from_secs(3));
         let list: Vec<serde_json::Value> = app
             .webviews()
-            .iter()
-            .map(|(label, wv)| {
-                serde_json::json!({
-                    "label": label,
-                    "url": wv.url().map(|u| u.to_string()).unwrap_or_else(|e| format!("err: {e}")),
-                })
-            })
+            .keys()
+            .map(|label| serde_json::json!({ "label": label }))
             .collect();
         let payload = serde_json::json!({ "at": std::time::SystemTime::now().duration_since(std::time::UNIX_EPOCH).map(|d| d.as_millis() as u64).unwrap_or(0), "webviews": list });
         let _ = fs::write(dir.join("dev_webviews.json"), payload.to_string());

@@ -9,7 +9,7 @@ D = os.path.expanduser("~/Library/Application Support/jilseo")
 CMD, RES = os.path.join(D, "dev_commands.json"), os.path.join(D, "dev_results.json")
 
 def run(cmd: dict, timeout: float = 60) -> dict:
-    cmd = {**cmd, "id": str(uuid.uuid4())}
+    cmd = {**cmd, "id": str(uuid.uuid4()), "at": int(time.time() * 1000)}
     tmp = CMD + ".tmp"
     with open(tmp, "w") as f: json.dump(cmd, f, ensure_ascii=False)
     os.replace(tmp, CMD)

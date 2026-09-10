@@ -6,7 +6,9 @@
   "selectors": {
     "input": "div.ql-editor[role=\"textbox\"], div[role=\"textbox\"][aria-label*=\"Gemini\"]",
     "send": "button.send-button, button[aria-label=\"메시지 보내기\"], button[aria-label=\"Send message\"]",
-    "response": "message-content"
+    "response": "message-content",
+    "fileMenu": "button[aria-label=\"업로드 및 도구\"], button[aria-label=\"Upload files and tools\"], button[aria-label*=\"업로드\"]",
+    "fileInput": "input.hidden-file-input"
   },
-  "verified": "2026-09-10 라이브 DOM 실측 완료: input·send·response(첫 Broadcast 응답 수집 확인). 파일 input 없음(업로드 메뉴 경유, Phase 3)"
+  "verified": "2026-09-10 라이브 DOM 실측 완료: input·send·response·fileMenu→fileInput(업로드 메뉴를 열면 hidden-file-input 생성). 첫 Broadcast 응답 수집 확인"
 }

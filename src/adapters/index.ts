@@ -1,12 +1,29 @@
 import { evalInPanel, panelUrl } from "../lib/panels";
-import { attachFileJs, insertTextJs, probeJs, readResponseHtmlJs, readResponseJs, submitJs } from "../inject/runtime";
+import {
+  attachFileJs,
+  clickJs,
+  clickSendJs,
+  escapeJs,
+  insertTextJs,
+  probeJs,
+  readResponseHtmlJs,
+  readResponseJs,
+  submitJs,
+} from "../inject/runtime";
 
 export interface ServiceDef {
   id: string;
   name: string;
   url: string;
   partition: string;
-  selectors: { input: string; send: string; response: string; fileInput?: string };
+  selectors: {
+    input: string;
+    send: string;
+    response: string;
+    fileInput?: string;
+    /** fileInput이 메뉴를 열어야 생기는 경우(Gemini) 먼저 클릭할 버튼 */
+    fileMenu?: string;
+  };
   verified?: string;
   /** "web": 웹슬롯(일반 URL). Broadcast 대상에서 제외 */
   kind?: "ai" | "web";
@@ -58,13 +75,30 @@ export class ServiceAdapter {
     if (!r.ok) throw new Error(r.reason ?? "insertText failed");
   }
 
-  async submit(): Promise<string> {
+  /**
+   * 전송. 버튼이 비활성이면(파일 업로드 처리 중 등) 활성화될 때까지 최대 waitMs 동안 재시도한 뒤,
+   * 그래도 안 되면 Enter 폴백(submitJs). 합성 Enter를 무시하는 사이트(ChatGPT)가 있어 버튼 클릭이 우선이다.
+   */
+  async submit(waitMs = 12_000): Promise<string> {
+    const deadline = Date.now() + waitMs;
+    let lastReason = "";
+    while (Date.now() < deadline) {
+      const r = await evalInPanel<{ ok: boolean; method?: string; reason?: string }>(
+        this.id,
+        clickSendJs(this.def.selectors.send),
+        5000,
+      );
+      if (r.ok) return r.method ?? "click";
+      lastReason = r.reason ?? "";
+      if (lastReason === "missing") break; // 버튼 자체가 없으면 기다려도 소용없음
+      await new Promise((res) => setTimeout(res, 500));
+    }
     const r = await evalInPanel<{ ok: boolean; method?: string; reason?: string }>(
       this.id,
       submitJs(this.def.selectors.send, this.def.selectors.input),
       5000,
     );
-    if (!r.ok) throw new Error(r.reason ?? "submit failed");
+    if (!r.ok) throw new Error(r.reason ?? `submit failed (${lastReason})`);
     return r.method ?? "unknown";
   }
 
@@ -140,11 +174,21 @@ export class ServiceAdapter {
   /** 파일 1개 첨부. 업로드 처리 시간을 위해 호출 뒤 잠시 기다려야 한다 */
   async attachFile(file: Attachment): Promise<string> {
     if (isTodoSelector(this.def.selectors.input)) throw new Error("입력창 셀렉터 미실측 (TODO)");
+    const menu = this.def.selectors.fileMenu;
+    if (menu && !isTodoSelector(menu)) {
+      // 메뉴를 열어야 file input이 DOM에 생기는 사이트. 열고 잠시 기다린 뒤 첨부, 끝나면 Escape로 닫는다.
+      await evalInPanel(this.id, clickJs(menu), 3000).catch(() => {});
+      await new Promise((res) => setTimeout(res, 600));
+    }
     const r = await evalInPanel<{ ok: boolean; method?: string; reason?: string }>(
       this.id,
       attachFileJs(this.def.selectors.fileInput, this.def.selectors.input, file),
       15000,
     );
+    if (menu && !isTodoSelector(menu)) {
+      await new Promise((res) => setTimeout(res, 300));
+      await evalInPanel(this.id, escapeJs(), 3000).catch(() => {});
+    }
     if (!r.ok) throw new Error(r.reason ?? "attach failed");
     return r.method ?? "unknown";
   }

@@ -19,6 +19,17 @@ function reportFatal(where: string, err: unknown) {
     invoke("write_store", { name: "dev_results", value: { id: "fatal", type: where, ok: false, result: { error: msg }, finished: Date.now() } }).catch(() => {});
   }
 }
+// DIAG heartbeat (개발 빌드 전용): UI 페이지 생존/언로드 추적. dev_results.json에 id "diag"로 기록
+if (import.meta.env.DEV) {
+  const mark = (kind: string) =>
+    invoke("write_store", {
+      name: "dev_results",
+      value: { id: "diag", kind, perf: Math.round(performance.now()), t: Date.now(), vis: document.visibilityState },
+    }).catch(() => {});
+  setInterval(() => mark("hb"), 1000);
+  window.addEventListener("pagehide", () => mark("pagehide"));
+  window.addEventListener("beforeunload", () => mark("beforeunload"));
+}
 window.addEventListener("error", (e) => reportFatal("window.error", e.error ?? e.message));
 window.addEventListener("unhandledrejection", (e) => reportFatal("unhandledrejection", e.reason));
 
