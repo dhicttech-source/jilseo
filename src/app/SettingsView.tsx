@@ -43,14 +43,14 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
         <section className="flex flex-col gap-3 rounded-lg border border-white/10 p-4">
           <h2 className="text-sm font-medium text-white/85">Supabase (Free 프로젝트 `jilseo`)</h2>
           <p className="text-xs text-white/40">
-            프롬프트 라이브러리·메모·비교 기록을 두 맥 간 공유합니다. 대시보드 → Project Settings → API 의 URL과 anon key.
+            프롬프트 라이브러리·메모·비교 기록을 두 맥 간 공유합니다. 대시보드 → Project Settings → API Keys 의 Project URL과 Publishable key (Secret key는 넣지 마세요).
             <code className="ml-1 text-white/60">supabase/schema.sql</code>을 SQL Editor에서 먼저 실행하세요.
           </p>
           <Field label="Project URL">
             <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://xxxx.supabase.co" className={input} />
           </Field>
-          <Field label="anon key">
-            <input value={anonKey} onChange={(e) => setAnonKey(e.target.value)} placeholder="eyJ…" className={input} />
+          <Field label="anon / publishable key (sb_publishable_… 또는 eyJ…)">
+            <input value={anonKey} onChange={(e) => setAnonKey(e.target.value)} placeholder="sb_publishable_…" className={input} />
           </Field>
           <div className="flex items-center gap-2">
             <button onClick={() => void saveConfig()} className="rounded bg-white/90 px-3 py-1.5 text-xs font-medium text-black">
