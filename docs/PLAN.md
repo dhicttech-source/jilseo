@@ -15,7 +15,9 @@
 | 개발 폴더 | `~/dev/jilseo` 생성 완료 | — |
 | Day 1 판정 | **GO** (2026-09-10) | `docs/day1-verification.md` |
 | Phase 1 | 핵심 완료 (2026-09-10) | `docs/adapter-test.md` |
-| Phase 2 | 구현 완료, Supabase 프로젝트 생성·dmg 병행 검증 대기 (2026-09-10) | `docs/CHANGELOG.md` |
+| Phase 2 | 완료 — Supabase 로그인·프롬프트·비교 기록·메모 저장 확인 (2026-09-10) | `docs/CHANGELOG.md` |
+| Phase 3 | 구현 완료 — 마크다운·웹슬롯 검증, 파일 첨부는 사용자 검증 대기 (2026-09-10) | `docs/unattended-report.md` |
+| Phase 4 | Rust 플랫폼 분기만 준비. Windows 빌드 환경 결정 필요 | `docs/PLAN.md` §Phase 4 |
 
 ## 1. Tauri 2 핵심 기술 결정 (Day 1 검증 대상)
 

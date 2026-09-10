@@ -9,7 +9,11 @@ function reportFatal(where: string, err: unknown) {
   const msg = err instanceof Error ? `${err.message}\n${err.stack ?? ""}` : String(err);
   const el = document.getElementById("root");
   if (el && !el.childElementCount) {
-    el.innerHTML = `<pre style="padding:16px;color:#f88;font:12px/1.5 monospace;white-space:pre-wrap">질서 시작 오류 (${where})\n${msg}</pre>`;
+    // innerHTML 대신 textContent: 오류 문자열에 페이지 내용이 섞여도 HTML로 해석되지 않게
+    const pre = document.createElement("pre");
+    pre.style.cssText = "padding:16px;color:#f88;font:12px/1.5 monospace;white-space:pre-wrap";
+    pre.textContent = `질서 시작 오류 (${where})\n${msg}`;
+    el.replaceChildren(pre);
   }
   if (import.meta.env.DEV) {
     invoke("write_store", { name: "dev_results", value: { id: "fatal", type: where, ok: false, result: { error: msg }, finished: Date.now() } }).catch(() => {});

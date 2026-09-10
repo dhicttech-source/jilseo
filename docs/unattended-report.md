@@ -34,6 +34,16 @@
 - 조치: 이분 탐색용 임시 코드 전부 원복, 스테이지 구성을 사용자 상태(ChatGPT·Claude·Gemini·Perplexity, 2열)로 복구, 앱 재시작.
 - 남은 무인 작업은 UI 불필요 항목만 진행: 코드 품질 점검, Supabase keepalive, Windows 분기(컴파일만), 문서, dmg 빌드.
 
+## 5. 품질 점검 (intent-review)
+- 보고서: `docs/reviews/intent-review-2026-09-10.md` (후보 9건: high 3 / medium 5 / low 1)
+- 적용한 것(동작 불변, 기계적 추출): 클라우드 행 저장 규칙 `saveRow()`로 통합(3곳), 열 수 클램프 `clampColumns()`, 서비스 합성 `composeServices()`, 스테이지 정합성 `sanitizeStage()`, TODO 셀렉터 센티널 상수
+- 남긴 것: `runBroadcast()` 2단계 분리, `broadcastText`/`addWebSlot` 개명 — 동작 변경이라 사용자 확인 후
+
+## 6. 기타
+- Supabase keepalive: launchd `com.dhict.jilseo.keepalive` 등록, 매일 09:15 REST 호출. 첫 실행 http 200 (`~/Library/Application Support/jilseo/keepalive.log`)
+- Phase 4 준비: 세션 파티션·UA를 플랫폼별 함수로 분리, nsis 타깃 추가. macOS 컴파일 확인. Windows 빌드는 Windows 머신 필요
+- 새 dmg: `release/jilseo_0.1.0_aarch64.dmg` (Phase 3 포함, 안내문 동봉)
+
 ## 사용자 확인 필요
 - Grok · Perplexity 로그인 후 셀렉터 실측
 - MacBook에 새 dmg 설치, 같은 Supabase 계정 로그인 → 프롬프트 공유 확인
