@@ -43,6 +43,16 @@ interface Settings {
   webSlots?: WebSlot[];
   /** 파일 전송 뒤 afterFileBroadcast=new_chat 서비스를 새 채팅으로 이동 (기본 켜짐) */
   newChatAfterFile?: boolean;
+  /** UI 크기 배율 (1.0 / 1.15 / 1.3 / 1.5) */
+  uiScale?: number;
+}
+
+export const UI_SCALES = [1, 1.15, 1.3, 1.5] as const;
+const DEFAULT_UI_SCALE = 1.15;
+
+/** 루트 font-size 배율 적용 (Tailwind rem 단위가 함께 커진다) */
+export function applyUiScale(scale: number) {
+  document.documentElement.style.setProperty("--ui-scale", String(scale));
 }
 
 /** 웹슬롯 → ServiceDef (셀렉터 없음, Broadcast 제외) */
@@ -96,9 +106,11 @@ interface StageState {
   baseServices: ServiceDef[];
   webSlots: WebSlot[];
   newChatAfterFile: boolean;
+  uiScale: number;
 
   init(): Promise<void>;
   setNewChatAfterFile(v: boolean): void;
+  setUiScale(scale: number): void;
   addWebSlot(url: string, name?: string): string | null;
   removeWebSlot(id: string): void;
   applyLayout(stage: string[], columns?: number): void;
@@ -116,8 +128,19 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function persist(get: () => StageState) {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    const { stage, columns, maximized, supabase, device, onboarded, webSlots, newChatAfterFile } = get();
-    const settings: Settings = { version: 1, stage, columns, maximized, supabase, device, onboarded, webSlots, newChatAfterFile };
+    const { stage, columns, maximized, supabase, device, onboarded, webSlots, newChatAfterFile, uiScale } = get();
+    const settings: Settings = {
+      version: 1,
+      stage,
+      columns,
+      maximized,
+      supabase,
+      device,
+      onboarded,
+      webSlots,
+      newChatAfterFile,
+      uiScale,
+    };
     invoke("write_settings", { settings }).catch(() => {});
   }, 200);
 }
@@ -138,6 +161,7 @@ export const useStage = create<StageState>((set, get) => ({
   baseServices: [],
   webSlots: [],
   newChatAfterFile: true,
+  uiScale: DEFAULT_UI_SCALE,
 
   async init() {
     const [svcRes, settings, dir, inset] = await Promise.all([
@@ -168,7 +192,15 @@ export const useStage = create<StageState>((set, get) => ({
       device: settings?.device ?? "mac_studio",
       onboarded: settings?.onboarded ?? false,
       newChatAfterFile: settings?.newChatAfterFile ?? true,
+      uiScale: settings?.uiScale ?? DEFAULT_UI_SCALE,
     });
+    applyUiScale(settings?.uiScale ?? DEFAULT_UI_SCALE);
+  },
+
+  setUiScale(scale) {
+    set({ uiScale: scale });
+    applyUiScale(scale);
+    persist(get);
   },
 
   setNewChatAfterFile(v) {

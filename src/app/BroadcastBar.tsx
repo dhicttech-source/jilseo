@@ -68,7 +68,7 @@ export function BroadcastBar() {
         onClick={() => fileRef.current?.click()}
         title="파일 1개를 모든 패널에 동시 첨부 (8MB 이하)"
         className={
-          "h-[44px] shrink-0 rounded-lg border px-3 text-sm " +
+          "h-12 shrink-0 rounded-lg border px-3.5 text-base " +
           (attachment ? "border-sky-400/50 bg-sky-400/15 text-sky-200" : "border-white/10 text-white/50 hover:bg-white/10")
         }
       >
@@ -78,7 +78,7 @@ export function BroadcastBar() {
         onClick={toggleLibrary}
         title="프롬프트 라이브러리"
         className={
-          "h-[44px] shrink-0 rounded-lg border px-3 text-sm " +
+          "h-12 shrink-0 rounded-lg border px-3.5 text-base " +
           (libraryOpen ? "border-white/30 bg-white/15 text-white/90" : "border-white/10 text-white/50 hover:bg-white/10")
         }
       >
@@ -100,20 +100,20 @@ export function BroadcastBar() {
             ? `${targets.map((t) => t.name).join(" · ")} 에게 동시에 보내기  (⌘⏎)`
             : "스테이지에 패널이 없습니다"
         }
-        className="min-h-[44px] flex-1 resize-y rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-sm text-white/90 outline-none placeholder:text-white/30 focus:border-white/30"
+        className="min-h-12 flex-1 resize-y rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-base text-white/90 outline-none placeholder:text-white/30 focus:border-white/30"
       />
       <div className="flex flex-col items-end gap-1">
         {attachment && (
-          <span className="flex items-center gap-1 rounded bg-sky-400/15 px-2 py-0.5 text-[11px] text-sky-200">
+          <span className="flex items-center gap-1 rounded bg-sky-400/15 px-2 py-0.5 text-xs text-sky-200">
             📎 {attachment.name} · {(attachment.size / 1024).toFixed(0)}KB
             <button onClick={() => setAttachment(null)} className="ml-1 text-sky-200/60 hover:text-white">✕</button>
           </span>
         )}
-        {summary && <span className="text-[11px] text-white/40">{summary}</span>}
+        {summary && <span className="text-xs text-white/50">{summary}</span>}
         <button
           onClick={() => void send()}
           disabled={busy || !text.trim() || targets.length === 0}
-          className="rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-black hover:bg-white disabled:cursor-not-allowed disabled:opacity-30"
+          className="rounded-lg bg-white/90 px-5 py-2.5 text-base font-medium text-black hover:bg-white disabled:cursor-not-allowed disabled:opacity-30"
         >
           {busy ? "전송 중…" : "▶ 보내기"}
         </button>

@@ -91,31 +91,31 @@ export function PanelSlot({ service }: { service: ServiceDef }) {
   const phase = status?.phase ?? "creating";
   return (
     <section className="flex min-h-0 min-w-0 flex-col bg-[#0f1115]">
-      <div className="flex h-7 shrink-0 items-center gap-2 px-2 text-[11px] text-white/60">
-        <span className="font-medium text-white/85">{service.name}</span>
-        {service.kind === "web" && <span className="rounded bg-white/10 px-1 text-[10px] text-white/50">웹</span>}
+      <div className="flex h-9 shrink-0 items-center gap-2 px-2.5 text-sm text-white/65">
+        <span className="font-semibold text-white/90">{service.name}</span>
+        {service.kind === "web" && <span className="rounded bg-white/10 px-1.5 text-xs text-white/50">웹</span>}
         <span className={PHASE_COLOR[phase]} title={status?.detail}>
           ● {PHASE_LABEL[phase]}
           {phase === "error" && status?.detail ? ` · ${status.detail.slice(0, 60)}` : ""}
         </span>
         <span className="ml-auto flex items-center gap-1">
-          {note && <span className="text-[10px] text-sky-300">{note}</span>}
+          {note && <span className="text-xs text-sky-300">{note}</span>}
           <button
-            className="rounded px-1.5 py-0.5 hover:bg-white/10"
+            className="rounded px-2 py-1 hover:bg-white/10"
             title="패널에서 선택한 텍스트를 메모로 저장"
             onClick={() => void saveNote()}
           >
             메모
           </button>
           <button
-            className="rounded px-1.5 py-0.5 hover:bg-white/10"
+            className="rounded px-2 py-1 text-base leading-none hover:bg-white/10"
             title={isMax ? "복귀" : "최대화"}
             onClick={() => setMaximized(isMax ? null : service.id)}
           >
             {isMax ? "⤡" : "⤢"}
           </button>
           <button
-            className="rounded px-1.5 py-0.5 hover:bg-white/10"
+            className="rounded px-2 py-1 text-base leading-none hover:bg-white/10"
             title="스테이지에서 내리기"
             onClick={() => toggleStage(service.id)}
           >

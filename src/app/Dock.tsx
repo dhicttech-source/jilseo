@@ -28,7 +28,7 @@ export function Dock() {
   };
 
   return (
-    <div className="flex h-10 shrink-0 items-center gap-2 overflow-x-auto border-t border-white/10 px-3">
+    <div className="flex h-12 shrink-0 items-center gap-2 overflow-x-auto border-t border-white/10 px-3">
       {services.map((svc) => {
         const on = stage.includes(svc.id);
         const todo = svc.kind !== "web" && isTodoSelector(svc.selectors.input);
@@ -41,7 +41,7 @@ export function Dock() {
               disabled={!on && full}
               title={todo ? "셀렉터 미실측 — 로그인 후 실측 필요" : svc.url}
               className={
-                "border px-3 py-1 text-xs transition " +
+                "border px-3.5 py-1.5 text-sm transition " +
                 (isWeb ? "rounded-l-full " : "rounded-full ") +
                 (on
                   ? "border-white/30 bg-white/10 text-white/90"
@@ -58,14 +58,14 @@ export function Dock() {
                 <button
                   onClick={() => (fav ? removeFavorite(fav.id) : addFavorite(svc.name, svc.url))}
                   title={fav ? "즐겨찾기 해제" : "즐겨찾기에 저장"}
-                  className="border-y border-white/10 px-1.5 py-1 text-[11px] text-white/40 hover:bg-white/10 hover:text-amber-300"
+                  className="border-y border-white/10 px-2 py-1.5 text-sm text-white/40 hover:bg-white/10 hover:text-amber-300"
                 >
                   {fav ? "★" : "☆"}
                 </button>
                 <button
                   onClick={() => removeWebSlot(svc.id)}
                   title="웹슬롯 제거"
-                  className="rounded-r-full border border-l-0 border-white/10 px-1.5 py-1 text-[11px] text-white/40 hover:bg-rose-500/20 hover:text-rose-300"
+                  className="rounded-r-full border border-l-0 border-white/10 px-2 py-1.5 text-sm text-white/40 hover:bg-rose-500/20 hover:text-rose-300"
                 >
                   ✕
                 </button>
@@ -83,7 +83,7 @@ export function Dock() {
             key={f.id}
             onClick={() => addWebSlot(f.url, f.name)}
             title={`${f.url}\n클릭하면 웹슬롯으로 추가`}
-            className="shrink-0 rounded-full border border-dashed border-amber-400/30 px-3 py-1 text-xs text-amber-200/60 hover:border-amber-400/60 hover:text-amber-200"
+            className="shrink-0 rounded-full border border-dashed border-amber-400/30 px-3.5 py-1.5 text-sm text-amber-200/60 hover:border-amber-400/60 hover:text-amber-200"
           >
             ★ {f.name}
           </button>
@@ -100,9 +100,9 @@ export function Dock() {
               if (e.key === "Escape") setUrlOpen(false);
             }}
             placeholder="https://…"
-            className="h-6 w-56 rounded border border-white/20 bg-white/5 px-2 text-xs text-white/90 outline-none"
+            className="h-8 w-64 rounded border border-white/20 bg-white/5 px-2 text-sm text-white/90 outline-none"
           />
-          <button onClick={submitUrl} className="rounded bg-white/15 px-2 py-1 text-xs text-white/90">
+          <button onClick={submitUrl} className="rounded bg-white/15 px-2.5 py-1.5 text-sm text-white/90">
             추가
           </button>
         </span>
@@ -111,19 +111,19 @@ export function Dock() {
           onClick={() => setUrlOpen(true)}
           disabled={full}
           title="일반 URL을 패널로 추가 (웹슬롯)"
-          className="shrink-0 rounded-full border border-dashed border-white/20 px-3 py-1 text-xs text-white/40 hover:border-white/40 hover:text-white/80 disabled:opacity-40"
+          className="shrink-0 rounded-full border border-dashed border-white/20 px-3.5 py-1.5 text-sm text-white/50 hover:border-white/40 hover:text-white/90 disabled:opacity-40"
         >
           + URL
         </button>
       )}
 
-      <span className="ml-auto flex shrink-0 items-center gap-1 text-[11px] text-white/40">
+      <span className="ml-auto flex shrink-0 items-center gap-1 text-sm text-white/50">
         열
         {[1, 2, 3, 4].map((n) => (
           <button
             key={n}
             onClick={() => setColumns(n)}
-            className={"h-5 w-5 rounded text-[11px] " + (columns === n ? "bg-white/15 text-white/90" : "hover:bg-white/10")}
+            className={"h-7 w-7 rounded text-sm " + (columns === n ? "bg-white/15 text-white/90" : "hover:bg-white/10")}
           >
             {n}
           </button>

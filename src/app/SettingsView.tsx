@@ -2,7 +2,7 @@ import { useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { useCloud } from "../store/cloud";
-import { useStage } from "../store/stage";
+import { UI_SCALES, useStage } from "../store/stage";
 
 const input = "rounded border border-white/15 bg-white/5 px-2 py-1.5 text-sm text-white/90 outline-none focus:border-white/40";
 
@@ -24,6 +24,8 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
   const setDevice = useStage((s) => s.setDevice);
   const servicesDir = useStage((s) => s.servicesDir);
   const newChatAfterFile = useStage((s) => s.newChatAfterFile);
+  const uiScale = useStage((s) => s.uiScale);
+  const setUiScale = useStage((s) => s.setUiScale);
   const setNewChatAfterFile = useStage((s) => s.setNewChatAfterFile);
   const cloud = useCloud();
   const [url, setUrl] = useState(supabase?.url ?? "");
@@ -129,6 +131,23 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
                 </button>
               ))}
               <input value={device} onChange={(e) => setDevice(e.target.value)} className={input + " w-32"} />
+            </div>
+          </Field>
+        </section>
+
+        <section className="flex flex-col gap-3 rounded-lg border border-white/10 p-4">
+          <h2 className="text-sm font-medium text-white/85">화면</h2>
+          <Field label="UI 크기 (글씨·버튼 배율, 패널 영역은 그만큼 줄어듦)">
+            <div className="flex gap-2">
+              {UI_SCALES.map((sc) => (
+                <button
+                  key={sc}
+                  onClick={() => setUiScale(sc)}
+                  className={"rounded px-3 py-1 text-xs " + (uiScale === sc ? "bg-white/20 text-white/90" : "bg-white/5 text-white/50")}
+                >
+                  {Math.round(sc * 100)}%
+                </button>
+              ))}
             </div>
           </Field>
         </section>

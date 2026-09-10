@@ -25,7 +25,7 @@ export function WorkstationBar() {
             onClick={() => void apply(w.id)}
             title={`${w.panels.map((p) => p.serviceId).join(" · ")}\n${new Date(w.updatedAt).toLocaleString()}`}
             className={
-              "rounded-l-full border px-2.5 py-0.5 text-[11px] " +
+              "rounded-l-full border px-3 py-1 text-sm " +
               (activeId === w.id
                 ? "border-sky-400/50 bg-sky-400/15 text-sky-200"
                 : "border-white/10 text-white/50 hover:border-white/25 hover:text-white/80")
@@ -36,14 +36,14 @@ export function WorkstationBar() {
           <button
             onClick={() => void saveCurrent(w.name, w.id)}
             title="현재 구성으로 덮어쓰기"
-            className="border-y border-white/10 px-1.5 py-0.5 text-[10px] text-white/30 hover:bg-white/10 hover:text-white/80"
+            className="border-y border-white/10 px-2 py-1 text-xs text-white/40 hover:bg-white/10 hover:text-white/80"
           >
             ↻
           </button>
           <button
             onClick={() => void remove(w.id)}
             title="삭제"
-            className="rounded-r-full border border-l-0 border-white/10 px-1.5 py-0.5 text-[10px] text-white/30 hover:bg-rose-500/20 hover:text-rose-300"
+            className="rounded-r-full border border-l-0 border-white/10 px-2 py-1 text-xs text-white/40 hover:bg-rose-500/20 hover:text-rose-300"
           >
             ✕
           </button>
@@ -60,9 +60,9 @@ export function WorkstationBar() {
               if (e.key === "Escape") setNaming(false);
             }}
             placeholder="이름"
-            className="h-5 w-28 rounded border border-white/20 bg-white/5 px-1.5 text-[11px] text-white/90 outline-none"
+            className="h-7 w-36 rounded border border-white/20 bg-white/5 px-2 text-sm text-white/90 outline-none"
           />
-          <button onClick={() => void commit()} className="rounded bg-white/15 px-2 py-0.5 text-[11px] text-white/90">
+          <button onClick={() => void commit()} className="rounded bg-white/15 px-2.5 py-1 text-sm text-white/90">
             저장
           </button>
         </span>
@@ -70,7 +70,7 @@ export function WorkstationBar() {
         <button
           onClick={() => setNaming(true)}
           title="현재 패널 구성과 각 패널의 대화 URL을 워크스테이션으로 저장"
-          className="rounded-full border border-dashed border-white/20 px-2.5 py-0.5 text-[11px] text-white/40 hover:border-white/40 hover:text-white/80"
+          className="rounded-full border border-dashed border-white/20 px-3 py-1 text-sm text-white/50 hover:border-white/40 hover:text-white/90"
         >
           + 워크스테이션
         </button>

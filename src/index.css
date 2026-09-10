@@ -2,6 +2,12 @@
 
 :root {
   color-scheme: dark;
+  /* UI 크기: 설정에서 1.0 / 1.15 / 1.3 / 1.5 */
+  --ui-scale: 1.15;
+}
+
+html {
+  font-size: calc(16px * var(--ui-scale));
 }
 
 html,

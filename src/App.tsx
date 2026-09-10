@@ -64,8 +64,8 @@ export default function App() {
 
   return (
     <div className="flex h-full flex-col">
-      <header className="flex h-9 shrink-0 items-center gap-3 border-b border-white/10 px-3 text-xs text-white/60">
-        <span className="font-medium text-white/85">질서 疾書</span>
+      <header className="flex h-11 shrink-0 items-center gap-3 border-b border-white/10 px-3 text-sm text-white/60">
+        <span className="text-base font-semibold text-white/90">질서 疾書</span>
         <span className="text-white/35">{stage.length}개 패널</span>
         {loaded && <WorkstationBar />}
         {serviceErrors.length > 0 && (
@@ -73,23 +73,23 @@ export default function App() {
             서비스 정의 오류 {serviceErrors.length}건
           </span>
         )}
-        {diag && <span className="ml-2 font-mono text-[10px] text-white/45">{diag}</span>}
+        {diag && <span className="ml-2 font-mono text-xs text-white/45">{diag}</span>}
         <button
-          className="ml-auto rounded px-2 py-0.5 text-white/45 hover:bg-white/10 hover:text-white/80"
+          className="ml-auto rounded px-2.5 py-1 text-white/55 hover:bg-white/10 hover:text-white/90"
           title="셀렉터 존재 여부와 응답 스냅샷을 diagnostics.json에 기록"
           onClick={() => void diagnose()}
         >
           진단
         </button>
         <button
-          className="rounded px-2 py-0.5 text-white/45 hover:bg-white/10 hover:text-white/80"
+          className="rounded px-2.5 py-1 text-white/55 hover:bg-white/10 hover:text-white/90"
           title={servicesDir}
           onClick={() => servicesDir && revealItemInDir(servicesDir).catch(() => {})}
         >
           셀렉터 JSON 폴더
         </button>
         <button
-          className={"rounded px-2 py-0.5 hover:bg-white/10 " + (view === "settings" ? "bg-white/15 text-white/90" : "text-white/45 hover:text-white/80")}
+          className={"rounded px-2.5 py-1 hover:bg-white/10 " + (view === "settings" ? "bg-white/15 text-white/90" : "text-white/55 hover:text-white/90")}
           title={`Supabase: ${cloudStatus}${queued ? ` · 대기열 ${queued}` : ""}`}
           onClick={() => setView(view === "settings" ? "stage" : "settings")}
         >
