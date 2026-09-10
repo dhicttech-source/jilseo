@@ -6,7 +6,7 @@
   "selectors": {
     "input": "div.ql-editor[role=\"textbox\"], div[role=\"textbox\"][aria-label*=\"Gemini\"]",
     "send": "button.send-button, button[aria-label=\"메시지 보내기\"], button[aria-label=\"Send message\"]",
-    "response": "message-content.model-response-text, message-content, model-response"
+    "response": "message-content"
   },
-  "verified": "2026-09-10 라이브 DOM 실측 (input·send). response는 첫 Broadcast 후 확인. 파일 입력 없음(업로드 메뉴 경유)"
+  "verified": "2026-09-10 라이브 DOM 실측 완료: input·send·response(첫 Broadcast 응답 수집 확인). 파일 input 없음(업로드 메뉴 경유, Phase 3)"
 }

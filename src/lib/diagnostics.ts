@@ -1,5 +1,5 @@
 import { invoke } from "@tauri-apps/api/core";
-import { ServiceAdapter, type ProbeResult, type ServiceDef } from "../adapters";
+import { ServiceAdapter, isTodoSelector, type ProbeResult, type ServiceDef } from "../adapters";
 import { evalInPanel } from "./panels";
 import { readResponseJs } from "../inject/runtime";
 
@@ -17,12 +17,14 @@ export async function runDiagnostics(targets: ServiceDef[]): Promise<{ path: str
     const item: PanelDiagnostic = { id: def.id };
     try {
       item.probe = await new ServiceAdapter(def).probe();
-      const r = await evalInPanel<{ count: number; length: number; text: string }>(
-        def.id,
-        readResponseJs(def.selectors.response),
-        5000,
-      );
-      item.response = { ...r, text: r.text.slice(0, 1500) };
+      if (!isTodoSelector(def.selectors.response)) {
+        const r = await evalInPanel<{ count: number; length: number; text: string }>(
+          def.id,
+          readResponseJs(def.selectors.response),
+          5000,
+        );
+        item.response = { ...r, text: r.text.slice(0, 1500) };
+      }
     } catch (e) {
       item.error = e instanceof Error ? e.message : String(e);
     }

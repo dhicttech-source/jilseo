@@ -9,5 +9,5 @@
     "response": "[data-message-author-role=\"assistant\"]",
     "fileInput": "input#upload-files"
   },
-  "verified": "2026-09-10 라이브 DOM 실측 (input·send·fileInput). response는 첫 Broadcast 후 확인"
+  "verified": "2026-09-10 라이브 DOM 실측 완료: input·send·fileInput·response(첫 Broadcast 응답 719자 수집 확인)"
 }

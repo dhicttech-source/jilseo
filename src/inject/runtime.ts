@@ -13,7 +13,9 @@ export const probeJs = (selectors: Record<string, string | undefined>) => `(() =
   const sels = ${JSON.stringify(selectors)};
   for (const k in sels) {
     if (!sels[k]) continue;
-    const el = document.querySelector(sels[k]);
+    if (String(sels[k]).startsWith('TODO')) { out[k] = { found: false, todo: true }; continue; }
+    let el = null;
+    try { el = document.querySelector(sels[k]); } catch (e) { out[k] = { found: false, invalid: String(e) }; continue; }
     out[k] = el ? { found: true, tag: el.tagName.toLowerCase(), vis: !!(el.offsetWidth || el.offsetHeight) } : { found: false };
   }
   return JSON.stringify({ url: location.href, title: document.title, selectors: out });
