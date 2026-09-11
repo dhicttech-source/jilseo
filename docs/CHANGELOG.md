@@ -9,7 +9,7 @@
 - 메모/워크스테이션이 쓰는 `panel_url`이 페이지 전환 중 앱을 죽일 수 있던 문제
 
 ### Added
-- UI 크기 설정(100/115/130/150%, 기본 115%). 헤더·패널 헤더·독·입력창 글씨와 버튼 확대. 온보딩·설치 안내 문구 갱신(가려져도 동작, 파일 후 새 채팅)
+- UI 크기 설정(100/115/130/150%, 기본 130%). 헤더·패널 헤더·독·입력창 글씨와 버튼 확대. 온보딩·설치 안내 문구 갱신(가려져도 동작, 파일 후 새 채팅)
 - 파일 전송 뒤 새 채팅 이동 옵션(설정 → Broadcast, 기본 켜짐). 서비스 JSON `afterFileBroadcast: "new_chat"`(ChatGPT)
 - Grok·Perplexity 셀렉터 실측 기입. Perplexity는 paste 이벤트 삽입 + readback
 - Gemini 파일 첨부: 업로드 메뉴 → 숨은 file input 경로 (`fileMenu` 셀렉터)

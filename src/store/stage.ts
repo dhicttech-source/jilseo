@@ -48,7 +48,7 @@ interface Settings {
 }
 
 export const UI_SCALES = [1, 1.15, 1.3, 1.5] as const;
-const DEFAULT_UI_SCALE = 1.15;
+const DEFAULT_UI_SCALE = 1.3;
 
 /** 루트 font-size 배율 적용 (Tailwind rem 단위가 함께 커진다) */
 export function applyUiScale(scale: number) {
