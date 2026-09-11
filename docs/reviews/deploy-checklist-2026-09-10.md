@@ -24,7 +24,7 @@
 ### ✅ 7. HTTPS — 모든 서비스·Supabase 통신 https. 앱 UI는 로컬 번들(tauri://). 팝업도 https만 허용.
 ### 🟡 8. Rate Limiting
 **발견:** 앱이 자동 반복 전송을 하지 않음(지시문 §8 준수, 300ms 지터). Supabase 로그인 시도 제한은 Supabase 기본값.
-**수정 방법:** 별도 조치 불필요. 다만 "Allow new users to sign up" 끄기(대시보드)는 사용자 확인 필요 🔍.
+**수정 방법:** 별도 조치 불필요. "Allow new users to sign up"은 2026-09-11 사용자가 껐고 `auth/v1/settings`에서 `disable_signup: true` 확인 ✅.
 
 ### ✅ 9. 배포 전 설정
 **발견:** 테스트 하네스·감시 스레드는 `import.meta.env.DEV` / `cfg(debug_assertions)`로 릴리스 빌드에서 제외. dmg에는 포함되지 않음. 디버그 플래그·기본 계정 없음.
