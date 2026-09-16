@@ -7,10 +7,10 @@
 1. 앱을 Applications 폴더로 드래그합니다.
 
 2. 처음 열 때 "손상되었기 때문에 열 수 없습니다" 또는 "확인되지 않은 개발자" 경고가 뜨면
-   다음 중 하나를 합니다.
-   - Applications에서 jilseo 앱을 우클릭 → 열기 → 열기
-   - 또는 시스템 설정 → 개인정보 보호 및 보안 → 아래쪽 "그래도 열기"
-   - 또는 터미널에서:  xattr -cr /Applications/jilseo.app
+   다음 중 하나를 합니다. (macOS 15 이상에서는 우클릭 → 열기로는 넘어가지 않습니다)
+   - 터미널에서:  xattr -cr /Applications/jilseo.app && open /Applications/jilseo.app
+   - 또는 경고를 한 번 닫은 뒤 시스템 설정 → 개인정보 보호 및 보안 → 아래쪽 "그래도 열기"
+   - macOS 14 이하라면 Applications에서 우클릭(또는 Control+클릭) → 열기 → 열기
 
 3. 앱이 열리면 각 패널에서 ChatGPT, Claude, Gemini 등에 직접 로그인합니다.
    - 앱은 비밀번호·쿠키를 다루지 않습니다. 로그인은 웹뷰 안에서 서비스 사이트가 처리합니다.
