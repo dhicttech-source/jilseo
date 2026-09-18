@@ -81,16 +81,28 @@ fn apply_session_partition<R: tauri::Runtime>(
     }
 }
 
-/// User-Agent. macOS는 Safari로 고정(Google 로그인 통과). Windows(WebView2)는 기본 Edge UA를 우선 쓰고,
-/// Google이 차단하면 Phase 4에서 Chrome UA 고정으로 전환한다.
-fn apply_user_agent<R: tauri::Runtime>(builder: WebviewBuilder<R>) -> WebviewBuilder<R> {
+/// Windows(WebView2)용 Chrome UA. 기본은 WebView2의 Edge UA를 쓰고,
+/// Google 로그인이 "안전하지 않은 브라우저"로 막히면 파일 `<app_data>/jilseo/force-chrome-ua`를 만들어 켠다.
+#[cfg(not(target_os = "macos"))]
+pub const CHROME_USER_AGENT: &str = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) \
+AppleWebKit/537.36 (KHTML, like Gecko) Chrome/140.0.0.0 Safari/537.36";
+
+/// User-Agent. macOS는 Safari로 고정(Google 로그인 통과).
+/// Windows는 기본 UA(Edge)를 쓰되, 플래그 파일이 있으면 Chrome UA로 고정한다 (재빌드 없이 현장에서 전환).
+fn apply_user_agent<R: tauri::Runtime>(app: &tauri::AppHandle<R>, builder: WebviewBuilder<R>) -> WebviewBuilder<R> {
     #[cfg(target_os = "macos")]
     {
+        let _ = app;
         builder.user_agent(SAFARI_USER_AGENT)
     }
     #[cfg(not(target_os = "macos"))]
     {
-        builder
+        let flag = app.path().data_dir().ok().map(|d| d.join("jilseo").join("force-chrome-ua"));
+        if flag.map(|f| f.exists()).unwrap_or(false) {
+            builder.user_agent(CHROME_USER_AGENT)
+        } else {
+            builder
+        }
     }
 }
 
@@ -140,7 +152,7 @@ pub fn create_panel(
         .background_throttling(BackgroundThrottlingPolicy::Disabled)
         .zoom_hotkeys_enabled(true);
     let builder = apply_session_partition(&app, builder, &service_id)?;
-    let builder = apply_user_agent(builder);
+    let builder = apply_user_agent(&app, builder);
 
     window
         .add_child(

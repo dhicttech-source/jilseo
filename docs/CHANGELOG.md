@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Phase 4 — Windows 1단계 (2026-09-18)
+- GitHub Actions `windows-build`: main push 또는 수동 실행 시 NSIS x64 설치 파일을 아티팩트로 생성
+- NSIS 현재 사용자 설치, WebView2 부트스트래퍼 자동, 한국어/영어
+- Windows Chrome UA 플래그 파일(`%APPDATA%\jilseo\force-chrome-ua`) — 재빌드 없이 현장 전환
+- `docs/windows-first-run.md`(SmartScreen 절차), `docs/day1-verification-windows.md`
+
 ### Fixed (2026-09-10 저녁)
 - **가려진 창에서 앱이 멈추던 문제**: UI·패널 webview에 `background_throttling(Disabled)` 적용 (macOS 14+). 다른 창에 덮이거나 화면이 잠겨도 전송·응답 관찰이 계속됨
 - 개발 감시 스레드의 `url()` 폴링이 페이지 전환 중 panic을 일으켜 앱이 종료되던 문제 제거. `panel_url`은 panic-safe

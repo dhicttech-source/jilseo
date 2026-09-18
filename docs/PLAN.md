@@ -17,7 +17,7 @@
 | Phase 1 | 핵심 완료 (2026-09-10) | `docs/adapter-test.md` |
 | Phase 2 | 완료 — Supabase 로그인·프롬프트·비교 기록·메모 저장 확인 (2026-09-10) | `docs/CHANGELOG.md` |
 | Phase 3 | 구현 완료 — 마크다운·웹슬롯 검증, 파일 첨부는 사용자 검증 대기 (2026-09-10) | `docs/unattended-report.md` |
-| Phase 4 | Rust 플랫폼 분기만 준비. Windows 빌드 환경 결정 필요 | `docs/PLAN.md` §Phase 4 |
+| Phase 4 | 1단계 진행 중 — GitHub Actions Windows 빌드 + 노트북 Day 1 검증 (2026-09-18) | `docs/day1-verification-windows.md` |
 
 ## 1. Tauri 2 핵심 기술 결정 (Day 1 검증 대상)
 
@@ -112,7 +112,7 @@ Tauri 2는 Windows에서 WebView2(Chromium)로 동작하며 프론트·어댑터
 | 빌드 환경 | 로컬 맥 | **맥에서 크로스 빌드 불가** → Windows PC 또는 GitHub Actions `windows-latest` 러너 | 지시문의 'CI 없음' 원칙과 충돌하므로 착수 시 결정 필요 |
 | 로컬 저장 경로 | `~/Library/Application Support/jilseo` | `%APPDATA%\jilseo` (`data_dir()`가 자동 처리) | 없음 |
 
-순서: (1) Windows 빌드 환경 확보 → (2) Day 1 검증 재현(3서비스 로그인·유지) → (3) 파티션·UA 분기 → (4) 어댑터 테스트 체크리스트 재실행 → (5) 설치 파일 + 첫 실행 안내
+순서: (1) Windows 빌드 환경 확보 — **GitHub Actions `windows-latest`로 결정 (2026-09-18)**, 테스트는 사용자 Windows 노트북 → (2) Day 1 검증 재현(3서비스 로그인·유지) → (3) 파티션·UA 분기(구현됨, `force-chrome-ua` 플래그) → (4) 어댑터 테스트 체크리스트 재실행 → (5) 설치 파일 + 첫 실행 안내(`docs/windows-first-run.md`)
 
 ## 4. 제약 재확인
 
