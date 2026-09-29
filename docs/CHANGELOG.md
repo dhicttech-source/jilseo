@@ -2,6 +2,17 @@
 
 ## [Unreleased]
 
+### Added — 생성→검증 파이프라인 모드 (2026-09-29)
+- 전송 바 "동시 / 생성→검증" 모드 토글. 파이프라인은 생성 패널 1개에 보낸 뒤 응답을 기다려, 검증 패널들에 "질문+답변+검증 템플릿"을 동시 전송 (클릭 1회에 생성 1건 + 검증 N건, 재시도·반복 없음)
+- 패널 헤더 역할 칩(생성/검증/제외, 파이프라인 모드에서만 표시). 미지정 시 첫 AI 패널이 생성, 나머지 검증. 워크스테이션에 모드·역할이 함께 저장돼 프리셋 역할
+- 설정 → "생성 → 검증 파이프라인": 검증 템플릿 편집(`{question}`, `{answer}`), 기본값 복원. 생성 답변은 20,000자에서 잘라 주입
+- 비교 기록은 기존 `comparisons.responses`에 생성은 서비스 id, 검증은 `verify:<id>` 키로 저장 (스키마 변경 없음)
+- `src/lib/broadcast.ts`: 전송·응답 수집을 `sendAndCollect`로 분리 (동시 전송과 파이프라인이 공유)
+- 하네스 명령 `pipeline`, `set_mode`, `set_role`; vitest 도입(`npm test`) — 역할 해석·템플릿 조립 유닛 테스트
+
+### Fixed (2026-09-29)
+- Gemini가 응답을 마친 뒤 포커스를 잃으면 `execCommand`와 paste 이벤트를 모두 무시해 입력이 실패하던 문제 → contenteditable DOM 직접 삽입 폴백(`insertDomJs`, 줄마다 `<p>`). Google 사이트는 Trusted Types로 `innerHTML` 대입을 막으므로 `createElement`/`createTextNode`만 사용
+
 ### Phase 4 — Windows 1단계 (2026-09-18)
 - GitHub Actions `windows-build`: main push 또는 수동 실행 시 NSIS x64 설치 파일을 아티팩트로 생성
 - NSIS 현재 사용자 설치, WebView2 부트스트래퍼 자동, 한국어/영어

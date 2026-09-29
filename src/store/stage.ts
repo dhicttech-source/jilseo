@@ -2,6 +2,8 @@ import { create } from "zustand";
 import { invoke } from "@tauri-apps/api/core";
 import { TODO_SELECTOR_PREFIX, type ServiceDef } from "../adapters";
 import { measureViewportInset } from "../lib/panels";
+import { assignRole, type PanelRole, type RoleMap, type SendMode } from "../lib/roles";
+import { DEFAULT_VERIFY_TEMPLATE } from "../lib/verifyPrompt";
 
 export type PanelPhase =
   | "creating"
@@ -45,6 +47,12 @@ interface Settings {
   newChatAfterFile?: boolean;
   /** UI 크기 배율 (1.0 / 1.15 / 1.3 / 1.5) */
   uiScale?: number;
+  /** 전송 모드 (기본 동시 전송) */
+  mode?: SendMode;
+  /** 파이프라인 역할 배정 (serviceId → 역할). 비어 있으면 첫 AI 패널이 생성, 나머지 검증 */
+  roles?: RoleMap;
+  /** 검증 패널에 보낼 템플릿 ({question}, {answer}) */
+  verifyTemplate?: string;
 }
 
 export const UI_SCALES = [1, 1.15, 1.3, 1.5] as const;
@@ -107,8 +115,16 @@ interface StageState {
   webSlots: WebSlot[];
   newChatAfterFile: boolean;
   uiScale: number;
+  mode: SendMode;
+  roles: RoleMap;
+  verifyTemplate: string;
 
   init(): Promise<void>;
+  setMode(mode: SendMode): void;
+  setRole(id: string, role: PanelRole): void;
+  /** 워크스테이션 복원용: 모드와 역할을 한 번에 교체 */
+  restorePipeline(mode: SendMode | undefined, roles: RoleMap | undefined): void;
+  setVerifyTemplate(t: string): void;
   setNewChatAfterFile(v: boolean): void;
   setUiScale(scale: number): void;
   addWebSlot(url: string, name?: string): string | null;
@@ -128,7 +144,8 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function persist(get: () => StageState) {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    const { stage, columns, maximized, supabase, device, onboarded, webSlots, newChatAfterFile, uiScale } = get();
+    const { stage, columns, maximized, supabase, device, onboarded, webSlots, newChatAfterFile, uiScale, mode, roles, verifyTemplate } =
+      get();
     const settings: Settings = {
       version: 1,
       stage,
@@ -140,6 +157,9 @@ function persist(get: () => StageState) {
       webSlots,
       newChatAfterFile,
       uiScale,
+      mode,
+      roles,
+      verifyTemplate,
     };
     invoke("write_settings", { settings }).catch(() => {});
   }, 200);
@@ -162,6 +182,9 @@ export const useStage = create<StageState>((set, get) => ({
   webSlots: [],
   newChatAfterFile: true,
   uiScale: DEFAULT_UI_SCALE,
+  mode: "broadcast",
+  roles: {},
+  verifyTemplate: DEFAULT_VERIFY_TEMPLATE,
 
   async init() {
     const [svcRes, settings, dir, inset] = await Promise.all([
@@ -193,8 +216,32 @@ export const useStage = create<StageState>((set, get) => ({
       onboarded: settings?.onboarded ?? false,
       newChatAfterFile: settings?.newChatAfterFile ?? true,
       uiScale: settings?.uiScale ?? DEFAULT_UI_SCALE,
+      mode: settings?.mode === "pipeline" ? "pipeline" : "broadcast",
+      roles: settings?.roles ?? {},
+      verifyTemplate: settings?.verifyTemplate?.trim() ? settings.verifyTemplate : DEFAULT_VERIFY_TEMPLATE,
     });
     applyUiScale(settings?.uiScale ?? DEFAULT_UI_SCALE);
+  },
+
+  setMode(mode) {
+    set({ mode });
+    persist(get);
+  },
+
+  setRole(id, role) {
+    const { roles, stage, services } = get();
+    set({ roles: assignRole(roles, stage, services, id, role) });
+    persist(get);
+  },
+
+  restorePipeline(mode, roles) {
+    set({ mode: mode ?? "broadcast", roles: roles ?? {} });
+    persist(get);
+  },
+
+  setVerifyTemplate(t) {
+    set({ verifyTemplate: t });
+    persist(get);
   },
 
   setUiScale(scale) {

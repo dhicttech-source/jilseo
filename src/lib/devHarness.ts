@@ -4,10 +4,13 @@
  * import.meta.env.DEV 에서만 시작되므로 dmg(프로덕션)에는 동작하지 않는다.
  *
  * dev_commands.json: { "id": "c1", "type": "broadcast", "text": "..." }
- * types: status | broadcast | diagnose | memo | apply_stage | set_columns | maximize | select_in_panel | eval | attach
+ * types: status | broadcast | pipeline | set_mode | set_role | diagnose | memo | apply_stage | set_columns | maximize
+ *        | select_in_panel | eval | attach | add_web_slot | remove_web_slot
  */
 import { readStore, writeStore } from "./store";
 import { runBroadcastAndWaitSent } from "./broadcast";
+import { runPipeline } from "./pipeline";
+import { resolvePipelineRoles, type PanelRole, type SendMode } from "./roles";
 import { saveNoteFor } from "./notes";
 import { evalInPanel } from "./panels";
 import { runDiagnostics } from "./diagnostics";
@@ -40,6 +43,8 @@ async function execute(cmd: Command): Promise<unknown> {
         status: stage.status,
         cloud: useCloud.getState().status,
         queued: useCloud.getState().queued,
+        mode: stage.mode,
+        roles: stage.roles,
       };
     case "broadcast": {
       const o = await runBroadcastAndWaitSent(String(cmd.text));
@@ -47,6 +52,20 @@ async function execute(cmd: Command): Promise<unknown> {
       const waitCompletion = cmd.wait === true;
       const done = waitCompletion ? await o.completion : null;
       return { sent: o.sent, okCount: o.okCount, ms: o.ms, completion: done };
+    }
+    case "pipeline": {
+      const steps: string[] = [];
+      const r = await runPipeline(String(cmd.text), (step, detail) => steps.push(`${step}: ${detail}`));
+      return { ...r, steps };
+    }
+    case "set_mode":
+      stage.setMode(cmd.mode as SendMode);
+      return { mode: useStage.getState().mode };
+    case "set_role": {
+      stage.setRole(String(cmd.serviceId), cmd.role as PanelRole);
+      const s = useStage.getState();
+      const resolved = resolvePipelineRoles(s.stage, s.roles, s.services);
+      return { roles: s.roles, generator: resolved.generator?.id ?? null, verifiers: resolved.verifiers.map((v) => v.id), error: resolved.error };
     }
     case "diagnose": {
       const targets = stage.stage.map((id) => stage.services.find((s) => s.id === id)!).filter(Boolean);

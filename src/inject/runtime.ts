@@ -55,6 +55,27 @@ export const insertTextJs = (inputSel: string, text: string) => `(() => {
   return JSON.stringify({ ok: now.length > 0, method: 'execCommand', now: now.slice(0, 80) });
 })()`;
 
+/**
+ * contenteditable에 DOM 직접 삽입 (줄마다 <p>). execCommand와 paste를 모두 무시하는 상태의 에디터(Gemini/Quill: 응답 뒤 포커스가 빠진 경우)용.
+ * innerHTML 대입은 쓰지 않는다 — Google 사이트는 Trusted Types로 막아 페이지 오류가 난다.
+ */
+export const insertDomJs = (inputSel: string, text: string) => `(() => {
+  const el = ${q(inputSel)};
+  if (!el) return JSON.stringify({ ok: false, reason: 'input not found: ' + ${JSON.stringify(inputSel)} });
+  if (el.tagName === 'TEXTAREA' || el.tagName === 'INPUT') return JSON.stringify({ ok: false, reason: 'not contenteditable' });
+  el.focus();
+  const t = ${JSON.stringify(text)};
+  while (el.firstChild) el.removeChild(el.firstChild);
+  for (const line of t.split('\\n')) {
+    const p = document.createElement('p');
+    p.appendChild(line ? document.createTextNode(line) : document.createElement('br'));
+    el.appendChild(p);
+  }
+  el.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: t }));
+  const now = (el.innerText || '').trim();
+  return JSON.stringify({ ok: now.includes(t.slice(0, 20)), method: 'dom', now: now.slice(0, 80) });
+})()`;
+
 /** 전송 버튼이 있고 활성이면 클릭. 비활성이면 { ok:false, reason:'disabled' } (앱이 재시도) */
 export const clickSendJs = (sendSel: string) => `(() => {
   const btn = ${q(sendSel)};

@@ -3,6 +3,8 @@
 사용: scripts/harness.py '<json 명령>' [timeout초]
 예:   scripts/harness.py '{"type":"status"}'
       scripts/harness.py '{"type":"broadcast","text":"질서 자동 테스트 1","wait":true}' 240
+      scripts/harness.py '{"type":"set_role","serviceId":"claude","role":"generate"}'
+      scripts/harness.py '{"type":"pipeline","text":"질서 파이프라인 테스트 1"}' 480
 """
 import json, os, sys, time, uuid
 D = os.path.expanduser("~/Library/Application Support/jilseo")

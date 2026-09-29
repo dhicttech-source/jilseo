@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ServiceDef } from "../adapters";
 import { createPanel, layoutPanels, navigatePanel, rectOf, setPanelVisible } from "../lib/panels";
 import { saveNoteFor } from "../lib/notes";
+import { effectiveRole, nextRole, resolvePipelineRoles, type PanelRole } from "../lib/roles";
 import { useStage } from "../store/stage";
 import { useWorkstations } from "../store/workstations";
 
@@ -31,6 +32,31 @@ const PHASE_COLOR: Record<string, string> = {
   error: "text-rose-400",
 };
 
+const ROLE_LABEL: Record<PanelRole, string> = { generate: "생성", verify: "검증", off: "제외" };
+const ROLE_CLASS: Record<PanelRole, string> = {
+  generate: "border-emerald-400/50 bg-emerald-400/15 text-emerald-200",
+  verify: "border-sky-400/50 bg-sky-400/15 text-sky-200",
+  off: "border-white/15 text-white/35",
+};
+
+/** 파이프라인 모드에서만 보이는 역할 칩. 클릭하면 생성 → 검증 → 제외 순환 */
+function RoleChip({ serviceId }: { serviceId: string }) {
+  const stage = useStage((s) => s.stage);
+  const roles = useStage((s) => s.roles);
+  const services = useStage((s) => s.services);
+  const setRole = useStage((s) => s.setRole);
+  const role = effectiveRole(serviceId, resolvePipelineRoles(stage, roles, services));
+  return (
+    <button
+      onClick={() => setRole(serviceId, nextRole(role))}
+      title="파이프라인 역할 (클릭: 생성 → 검증 → 제외)"
+      className={"rounded-full border px-2 py-0.5 text-xs " + ROLE_CLASS[role]}
+    >
+      {ROLE_LABEL[role]}
+    </button>
+  );
+}
+
 /** 슬롯 하나 = 네이티브 webview가 올라가는 영역 + 헤더. 마운트 시 표시, 언마운트 시 숨김. */
 export function PanelSlot({ service }: { service: ServiceDef }) {
   const ref = useRef<HTMLDivElement | null>(null);
@@ -40,6 +66,7 @@ export function PanelSlot({ service }: { service: ServiceDef }) {
   const setMaximized = useStage((s) => s.setMaximized);
   const setStatus = useStage((s) => s.setStatus);
   const toggleStage = useStage((s) => s.toggleStage);
+  const mode = useStage((s) => s.mode);
   const isMax = maximized === service.id;
   const [note, setNote] = useState<string | null>(null);
 
@@ -94,6 +121,7 @@ export function PanelSlot({ service }: { service: ServiceDef }) {
       <div className="flex h-9 shrink-0 items-center gap-2 px-2.5 text-sm text-white/65">
         <span className="font-semibold text-white/90">{service.name}</span>
         {service.kind === "web" && <span className="rounded bg-white/10 px-1.5 text-xs text-white/50">웹</span>}
+        {mode === "pipeline" && service.kind !== "web" && <RoleChip serviceId={service.id} />}
         <span className={PHASE_COLOR[phase]} title={status?.detail}>
           ● {PHASE_LABEL[phase]}
           {phase === "error" && status?.detail ? ` · ${status.detail.slice(0, 60)}` : ""}

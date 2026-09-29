@@ -2,6 +2,7 @@ import { useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { useCloud } from "../store/cloud";
+import { DEFAULT_VERIFY_TEMPLATE } from "../lib/verifyPrompt";
 import { UI_SCALES, useStage } from "../store/stage";
 
 const input = "rounded border border-white/15 bg-white/5 px-2 py-1.5 text-sm text-white/90 outline-none focus:border-white/40";
@@ -27,6 +28,8 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
   const uiScale = useStage((s) => s.uiScale);
   const setUiScale = useStage((s) => s.setUiScale);
   const setNewChatAfterFile = useStage((s) => s.setNewChatAfterFile);
+  const verifyTemplate = useStage((s) => s.verifyTemplate);
+  const setVerifyTemplate = useStage((s) => s.setVerifyTemplate);
   const cloud = useCloud();
   const [url, setUrl] = useState(supabase?.url ?? "");
   const [anonKey, setAnonKey] = useState(supabase?.anonKey ?? "");
@@ -169,6 +172,29 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
               </span>
             </span>
           </label>
+        </section>
+
+        <section className="flex flex-col gap-3 rounded-lg border border-white/10 p-4">
+          <h2 className="text-sm font-medium text-white/85">생성 → 검증 파이프라인</h2>
+          <p className="text-xs text-white/40">
+            전송 바의 "생성→검증" 모드에서 검증 패널에 보내는 템플릿입니다. <code className="text-white/60">{"{question}"}</code>은 원래 질문,{" "}
+            <code className="text-white/60">{"{answer}"}</code>는 생성 패널의 답변으로 바뀝니다. 역할(생성/검증/제외)은 패널 헤더의 칩으로 정하고 워크스테이션에 함께 저장됩니다.
+          </p>
+          <Field label="검증 템플릿">
+            <textarea
+              value={verifyTemplate}
+              onChange={(e) => setVerifyTemplate(e.target.value)}
+              rows={10}
+              className={input + " resize-y font-mono"}
+            />
+          </Field>
+          <button
+            onClick={() => setVerifyTemplate(DEFAULT_VERIFY_TEMPLATE)}
+            disabled={verifyTemplate === DEFAULT_VERIFY_TEMPLATE}
+            className="self-start rounded bg-white/10 px-3 py-1 text-xs text-white/80 disabled:opacity-30"
+          >
+            기본 템플릿으로 되돌리기
+          </button>
         </section>
 
         <section className="flex flex-col gap-2 rounded-lg border border-white/10 p-4">

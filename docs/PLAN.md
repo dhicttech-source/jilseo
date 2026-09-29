@@ -18,6 +18,7 @@
 | Phase 2 | 완료 — Supabase 로그인·프롬프트·비교 기록·메모 저장 확인 (2026-09-10) | `docs/CHANGELOG.md` |
 | Phase 3 | 구현 완료 — 마크다운·웹슬롯 검증, 파일 첨부는 사용자 검증 대기 (2026-09-10) | `docs/unattended-report.md` |
 | Phase 4 | 1단계 진행 중 — GitHub Actions Windows 빌드 + 노트북 Day 1 검증 (2026-09-18) | `docs/day1-verification-windows.md` |
+| 파이프라인 모드 | 구현 (2026-09-29) — 생성 1 → 검증 N, 역할 칩·템플릿·워크스테이션 저장. 자동 라우팅은 보류(기록이 쌓인 뒤 "추천"으로만 검토) | `docs/CHANGELOG.md` |
 
 ## 1. Tauri 2 핵심 기술 결정 (Day 1 검증 대상)
 

@@ -4,6 +4,7 @@ import {
   clickJs,
   clickSendJs,
   escapeJs,
+  insertDomJs,
   insertTextJs,
   probeJs,
   readInputJs,
@@ -80,9 +81,17 @@ export class ServiceAdapter {
     if (r.pending) {
       // paste 경로: 에디터 반영이 비동기 → 잠시 뒤 실제로 들어갔는지 확인
       await new Promise((res) => setTimeout(res, 700));
-      const chk = await evalInPanel<{ text: string }>(this.id, readInputJs(this.def.selectors.input), 3000);
-      if (!chk.text.includes(text.slice(0, 20))) throw new Error("insert via paste not reflected");
+      if (await this.inputReflects(text)) return;
+      // paste도 무시된 경우(Gemini가 응답 뒤 포커스를 잃으면 execCommand·paste 모두 무시) → DOM 직접 삽입
+      const d = await evalInPanel<{ ok: boolean; reason?: string }>(this.id, insertDomJs(this.def.selectors.input, text), 5000);
+      if (!d.ok) throw new Error(`insert via paste/dom not reflected${d.reason ? `: ${d.reason}` : ""}`);
     }
+  }
+
+  /** 입력창에 텍스트의 앞부분이 실제로 들어갔는지 */
+  private async inputReflects(text: string): Promise<boolean> {
+    const chk = await evalInPanel<{ text: string }>(this.id, readInputJs(this.def.selectors.input), 3000).catch(() => ({ text: "" }));
+    return chk.text.includes(text.slice(0, 20));
   }
 
   /**
