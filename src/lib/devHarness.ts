@@ -13,6 +13,7 @@ import { runPipeline } from "./pipeline";
 import { resolvePipelineRoles, type PanelRole, type SendMode } from "./roles";
 import type { Judged } from "./lenses";
 import { usePipelineResult } from "../store/pipelineResult";
+import { probeRecords } from "./devProbe";
 import { saveNoteFor } from "./notes";
 import { evalInPanel } from "./panels";
 import { runDiagnostics } from "./diagnostics";
@@ -66,6 +67,8 @@ async function execute(cmd: Command): Promise<unknown> {
         verifiers: r.verifiers.map((v) => ({ ...v, lens: v.lens.id, text: v.text.slice(0, 400) })),
       };
     }
+    case "probes":
+      return probeRecords();
     case "last_pipeline": {
       const r = usePipelineResult.getState().result;
       return r ? { ...r, verifiers: r.verifiers.map((v) => ({ ...v, lens: v.lens.id, text: v.text.slice(0, 400) })) } : null;
@@ -126,7 +129,7 @@ async function execute(cmd: Command): Promise<unknown> {
 }
 
 /** 긴 명령(pipeline·broadcast)이 도는 동안에도 실행해도 되는 읽기 전용 명령 */
-const CONCURRENT_TYPES = new Set(["status", "eval", "last_pipeline"]);
+const CONCURRENT_TYPES = new Set(["status", "eval", "last_pipeline", "probes"]);
 
 async function tick() {
   const cmd = await readStore<Command>("dev_commands").catch(() => null);
@@ -148,8 +151,33 @@ async function tick() {
     ok = false;
     result = { error: e instanceof Error ? e.message : String(e) };
   }
-  await writeStore("dev_results", { id: cmd.id, type: cmd.type, ok, result, started, finished: Date.now() }).catch(() => {});
+  await writeResult({ id: cmd.id, type: cmd.type, ok, result, started, finished: Date.now() });
   if (!concurrent) running = false;
+}
+
+interface ResultEntry {
+  id: string;
+  type: string;
+  ok: boolean;
+  result: unknown;
+  started: number;
+  finished: number;
+}
+const RECENT_KEEP = 20;
+
+/**
+ * 결과 기록. 최신 결과를 최상위에 두고, 최근 결과 RECENT_KEEP개를 `recent[id]`에도 남긴다 —
+ * 읽기 전용 명령이 동시에 돌 때 긴 명령의 결과가 덮여 사라지지 않도록 (클라이언트는 id로 recent도 찾는다).
+ */
+async function writeResult(entry: ResultEntry) {
+  const prev = await readStore<{ recent?: Record<string, ResultEntry> }>("dev_results").catch(() => null);
+  const recent: Record<string, ResultEntry> = { ...(prev?.recent ?? {}), [entry.id]: entry };
+  const ids = Object.values(recent)
+    .sort((a, b) => b.finished - a.finished)
+    .slice(0, RECENT_KEEP)
+    .map((e) => e.id);
+  const kept = Object.fromEntries(ids.map((id) => [id, recent[id]]));
+  await writeStore("dev_results", { ...entry, recent: kept }).catch(() => {});
 }
 
 declare global {

@@ -1,4 +1,5 @@
 import { evalInPanel, panelUrl } from "../lib/panels";
+import { probeGenerating, resetProbe } from "../lib/devProbe";
 import {
   attachFileJs,
   clickJs,
@@ -165,6 +166,7 @@ export class ServiceAdapter {
     const { quietMs = genSel ? 3000 : 8000, pollMs = 700, maxMs = 180_000, signal, baseline = { count: 0, text: "" } } = opts;
     const sel = this.def.selectors.response;
     if (isTodoSelector(sel)) return Promise.resolve("");
+    if (import.meta.env.DEV) resetProbe(this.id);
     return new Promise((resolve) => {
       const start = Date.now();
       let last = "";
@@ -174,6 +176,7 @@ export class ServiceAdapter {
         r.text.length > 0 && (r.count > baseline.count || r.text !== baseline.text);
       const tick = async () => {
         if (signal?.aborted) return resolve(last);
+        if (import.meta.env.DEV) await probeGenerating(this.id); // 생성 중 표시 실측 (개발 빌드만)
         try {
           const r = await evalInPanel<{ count: number; length: number; text: string; generating: boolean }>(
             this.id,

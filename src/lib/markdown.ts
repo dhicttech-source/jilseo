@@ -6,13 +6,11 @@ const td = new TurndownService({
   bulletListMarker: "-",
   emDelimiter: "*",
 });
-// 버튼·아이콘·숨김 요소는 본문이 아니다 (Claude의 "웹 검색됨" 칩, 복사 버튼 등)
+// 버튼·아이콘·숨김 요소는 본문이 아니다 (Claude의 "웹 검색됨" 칩, 복사 버튼, 화면 낭독용 sr-only 제목 등)
 td.remove(["button", "style", "script", "noscript"]);
+const isScreenReaderOnly = (el: Element) => el.classList.contains("sr-only") || el.getAttribute("aria-hidden") === "true";
 td.addRule("nonContent", {
-  filter: (node) =>
-    node.nodeName === "svg" ||
-    node.nodeName === "SVG" ||
-    (node.nodeType === 1 && (node as Element).getAttribute("aria-hidden") === "true"),
+  filter: (node) => node.nodeName === "svg" || node.nodeName === "SVG" || (node.nodeType === 1 && isScreenReaderOnly(node as Element)),
   replacement: () => "",
 });
 // <pre><code class="language-x"> → ```x

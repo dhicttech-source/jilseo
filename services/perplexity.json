@@ -9,7 +9,7 @@
     "response": "div[data-workflow-final-text] .prose, .prose",
     "fileInput": "input[type=\"file\"]",
     "fileMenu": "button[aria-label=\"파일 또는 도구 추가\"], button[aria-label*=\"Attach\"]",
-    "generating": "TODO(selector)"
+    "generating": "button[aria-label^=\"응답 중지\"], button[aria-label^=\"Stop\"]"
   },
   "verified": "2026-09-10 라이브 DOM 실측 완료: input(#ask-input, paste 삽입+readback)·send(aria 제출)·fileInput·fileMenu·response(prose). 토큰 응답 수집 확인"
 }

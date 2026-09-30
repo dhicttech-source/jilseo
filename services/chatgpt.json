@@ -8,7 +8,7 @@
     "send": "button[data-testid=\"send-button\"]",
     "response": "[data-message-author-role=\"assistant\"]",
     "fileInput": "input#upload-files",
-    "generating": "TODO(selector)"
+    "generating": "button[data-testid=\"stop-button\"]"
   },
   "verified": "2026-09-10 라이브 DOM 실측 완료: input·send·fileInput·response(첫 Broadcast 응답 719자 수집 확인) / 파일 첨부 대화방에서는 이후 응답이 생성되지 않아(무료 플랜) afterFileBroadcast=new_chat",
   "afterFileBroadcast": "new_chat"

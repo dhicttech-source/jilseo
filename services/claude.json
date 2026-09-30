@@ -8,7 +8,7 @@
     "send": "button[data-testid=\"chat-input-send\"]",
     "response": "div[data-is-streaming], .font-claude-response, .font-claude-message",
     "fileInput": "input[data-testid=\"file-upload\"]",
-    "generating": "TODO(selector)"
+    "generating": "div[data-is-streaming=\"true\"]"
   },
   "verified": "2026-09-10 라이브 DOM 실측 완료: input·send·fileInput·response(첫 Broadcast 응답 수집 확인). response 텍스트에 '웹 검색됨' 도구 칩이 섞임 → Phase 3 마크다운 변환에서 정리"
 }

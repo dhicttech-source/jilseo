@@ -118,12 +118,26 @@ export const clearInputJs = (inputSel: string) => `(() => {
 
 /** 마지막 응답 컨테이너의 텍스트 스냅샷 (완료 판정은 앱 쪽 폴링: 3초간 변화 없음) */
 /**
+ * 마지막 응답 컨테이너 고르기 (sel, els 가 정의된 문맥에 삽입되는 식):
+ * - 뒤에서부터 텍스트가 비어 있지 않은 첫 요소 (Gemini는 끝에 빈 message-content가 붙는다)
+ * - 그 요소를 포함하는 가장 바깥 매칭 요소 (Claude는 스트리밍 중 내부 조각도 셀렉터에 걸려 1글자만 읽힌다)
+ */
+const LAST_RESPONSE_EL = `(() => {
+    let el = null;
+    for (let i = els.length - 1; i >= 0; i--) { if ((els[i].innerText || '').trim()) { el = els[i]; break; } }
+    if (!el) el = els[els.length - 1] || null;
+    while (el && el.parentElement) { const up = el.parentElement.closest(sel); if (!up) break; el = up; }
+    return el;
+  })()`;
+
+/**
  * 마지막 응답 컨테이너의 텍스트. generatingSel이 주어지면 "생성 중" 표시(중지 버튼·스트리밍 속성)가 보이는지도 함께 돌려준다.
  * 검색·도구 호출로 몇 초씩 멈추는 구간을 "완료"로 오인하지 않기 위한 근거.
  */
 export const readResponseJs = (responseSel: string, generatingSel?: string) => `(() => {
-  const els = document.querySelectorAll(${JSON.stringify(responseSel)});
-  const last = els[els.length - 1];
+  const sel = ${JSON.stringify(responseSel)};
+  const els = document.querySelectorAll(sel);
+  const last = ${LAST_RESPONSE_EL};
   const text = last ? (last.innerText || '') : '';
   const g = ${generatingSel ? `document.querySelector(${JSON.stringify(generatingSel)})` : "null"};
   const generating = !!g && (g.offsetWidth > 0 || g.offsetHeight > 0 || g.tagName === 'DIV');
@@ -132,8 +146,9 @@ export const readResponseJs = (responseSel: string, generatingSel?: string) => `
 
 /** 마지막 응답 컨테이너의 HTML (마크다운 변환용) */
 export const readResponseHtmlJs = (responseSel: string) => `(() => {
-  const els = document.querySelectorAll(${JSON.stringify(responseSel)});
-  const last = els[els.length - 1];
+  const sel = ${JSON.stringify(responseSel)};
+  const els = document.querySelectorAll(sel);
+  const last = ${LAST_RESPONSE_EL};
   return JSON.stringify({ count: els.length, html: last ? (last.outerHTML || '').slice(0, 400000) : '' });
 })()`;
 
