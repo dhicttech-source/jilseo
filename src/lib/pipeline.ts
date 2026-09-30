@@ -2,14 +2,15 @@ import { ServiceAdapter, type Attachment } from "../adapters";
 import { moveToNewChatAfterFile, sendAndCollect } from "./broadcast";
 import { buildLensPrompt, parseVerdict, resolveLens, VERDICTS_KEY, type Lens, type Verdict } from "./lenses";
 import { depthOf, findPreset, limitByDepth, type Depth } from "./presets";
+import { DEFAULT_REVISE_TEMPLATE, REVISE_TEMPLATE_KEY, buildRevisePrompt, revisedKey } from "./revise";
 import { resolvePipelineRoles } from "./roles";
-import { saveRow } from "./supabase";
+import { saveRow, updateOrQueue } from "./supabase";
 import { verifyKey } from "./verifyPrompt";
 import { useAttachment } from "../store/attachment";
 import { useCloud } from "../store/cloud";
 import { useStage } from "../store/stage";
 
-export type PipelineStep = "generate" | "verify" | "done";
+export type PipelineStep = "generate" | "verify" | "revise" | "done";
 
 export interface VerifierResult {
   serviceId: string;
@@ -36,6 +37,9 @@ export interface PipelineResult {
   presetId: string | null;
   /** 깊이 상한으로 이번 실행에서 빠진 검증 패널 id */
   skipped: string[];
+  /** 수정 단계 결과 (심층 깊이 자동, 그 외 카드 버튼). 없으면 미실행 */
+  revised?: string;
+  reviseError?: string;
 }
 
 /** 검증 패널의 렌즈 (미배정은 종합) */
@@ -44,9 +48,10 @@ export function lensFor(serviceId: string): Lens {
   return resolveLens(lensAssign[serviceId], lensOverrides, customLenses);
 }
 
-/** 비교 기록 responses jsonb 조립: 생성은 id, 검증은 verify:id, 판정 메타는 _verdicts */
-export function buildResponsesRow(generatorId: string, answer: string, verifiers: VerifierResult[]) {
+/** 비교 기록 responses jsonb 조립: 생성은 id, 검증은 verify:id, 수정본은 revised:id, 판정 메타는 _verdicts */
+export function buildResponsesRow(generatorId: string, answer: string, verifiers: VerifierResult[], revised?: string) {
   const responses: Record<string, unknown> = { [generatorId]: answer };
+  if (revised?.trim()) responses[revisedKey(generatorId)] = revised;
   const verdicts: Record<string, Verdict> = {};
   for (const v of verifiers) {
     if (!v.sent) continue;
@@ -119,8 +124,7 @@ export async function runPipeline(
   if (attachment) moveToNewChatAfterFile([gen]);
 
   const verifiersSent = verifiers.filter((v) => v.sent).length;
-  onProgress("done", `검증 ${verifiersSent}/${verifierDefs.length}`);
-  return {
+  const result: PipelineResult = {
     rowId,
     prompt: body,
     generator: gen.id,
@@ -135,6 +139,46 @@ export async function runPipeline(
     presetId,
     skipped,
   };
+  // 심층 깊이: 판정을 생성 패널에 되돌려 수정본까지 받는다 (전송 +1, 고정 순서)
+  const final = depth === "deep" && verifiersSent > 0 ? await runRevise(result, onProgress) : result;
+  onProgress("done", `검증 ${verifiersSent}/${verifierDefs.length}${final.revised ? " · 수정본 수신" : ""}`);
+  return final;
+}
+
+/** 수정 단계 템플릿 (설정에서 덮어쓰기 가능) */
+export function reviseTemplate(): string {
+  return useStage.getState().lensOverrides[REVISE_TEMPLATE_KEY]?.trim() || DEFAULT_REVISE_TEMPLATE;
+}
+
+/**
+ * 수정 단계: 검증 판정들을 생성 패널의 같은 대화에 보내 수정본을 받고, 같은 비교 기록 행에 revised:<id>로 저장한다.
+ * 심층 깊이의 자동 실행과 카드의 "수정본 요청" 버튼이 함께 쓴다. 사용자 동작 1회 = 전송 1회.
+ */
+export async function runRevise(result: PipelineResult, onProgress: (step: PipelineStep, detail: string) => void = () => {}): Promise<PipelineResult> {
+  const { services } = useStage.getState();
+  const gen = services.find((s) => s.id === result.generator);
+  if (!gen) return { ...result, reviseError: "생성 패널이 없습니다" };
+  const prompt = buildRevisePrompt(
+    reviseTemplate(),
+    result.verifiers
+      .filter((v) => v.sent)
+      .map((v) => ({ name: services.find((s) => s.id === v.serviceId)?.name ?? v.serviceId, lensName: v.lens.name, text: v.text })),
+  );
+  if (!prompt) return { ...result, reviseError: "되돌릴 판정이 없습니다" };
+  onProgress("revise", `${gen.name} 수정본 작성 중`);
+  const r = await sendAndCollect(prompt, [new ServiceAdapter(gen)], null);
+  if (!r.sent[gen.id]?.ok) return { ...result, reviseError: `수정 전송 실패: ${r.sent[gen.id]?.detail ?? ""}` };
+  const revised = r.responses[gen.id] ?? "";
+  if (!revised.trim()) return { ...result, reviseError: `${gen.name} 수정본을 받지 못했습니다` };
+  const next: PipelineResult = { ...result, revised, reviseError: undefined };
+  if (result.saved !== "skipped") {
+    const cloud = useCloud.getState();
+    await updateOrQueue(cloud.config(), "comparisons", result.rowId, {
+      responses: buildResponsesRow(result.generator, result.answer, result.verifiers, revised),
+    });
+    void cloud.flush();
+  }
+  return next;
 }
 
 /** 프리셋 슬롯 순서대로 검증 패널 id를 정렬한 목록 (깊이 절단의 우선순위) */

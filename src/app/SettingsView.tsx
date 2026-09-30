@@ -3,6 +3,7 @@ import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { useCloud } from "../store/cloud";
 import { BUILTIN_LENSES, VERDICT_BLOCK, resolveLens } from "../lib/lenses";
+import { DEFAULT_REVISE_TEMPLATE, REVISE_TEMPLATE_KEY } from "../lib/revise";
 import { UI_SCALES, useStage } from "../store/stage";
 
 const input = "rounded border border-white/15 bg-white/5 px-2 py-1.5 text-sm text-white/90 outline-none focus:border-white/40";
@@ -255,6 +256,29 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
             <summary className="cursor-pointer">모든 렌즈에 붙는 판정 블록 보기</summary>
             <pre className="mt-1 whitespace-pre-wrap font-mono text-white/50">{VERDICT_BLOCK}</pre>
           </details>
+        </section>
+
+        <section className="flex flex-col gap-3 rounded-lg border border-white/10 p-4">
+          <h2 className="text-sm font-medium text-white/85">수정 단계 템플릿</h2>
+          <p className="text-xs text-white/40">
+            심층 깊이에서 자동으로, 다른 깊이에서는 요약 카드의 "지적 반영 수정본 요청"으로 생성 패널에 보냅니다. 같은 대화에 보내므로 질문과 원답은 넣지 않고{" "}
+            <code className="text-white/60">{"{verdicts}"}</code>에 검증 판정들이 들어갑니다.
+          </p>
+          <Field label={`템플릿${lensOverrides[REVISE_TEMPLATE_KEY] ? " (수정됨)" : ""}`}>
+            <textarea
+              value={lensOverrides[REVISE_TEMPLATE_KEY] || DEFAULT_REVISE_TEMPLATE}
+              onChange={(e) => setLensOverride(REVISE_TEMPLATE_KEY, e.target.value)}
+              rows={8}
+              className={input + " resize-y font-mono"}
+            />
+          </Field>
+          <button
+            onClick={() => setLensOverride(REVISE_TEMPLATE_KEY, "")}
+            disabled={!lensOverrides[REVISE_TEMPLATE_KEY]}
+            className="self-start rounded bg-white/10 px-3 py-1 text-xs text-white/80 disabled:opacity-30"
+          >
+            기본 템플릿으로 되돌리기
+          </button>
         </section>
 
         <section className="flex flex-col gap-2 rounded-lg border border-white/10 p-4">

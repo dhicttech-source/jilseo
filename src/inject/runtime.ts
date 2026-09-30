@@ -145,9 +145,10 @@ export const readResponseJs = (responseSel: string, generatingSel?: string) => `
   const els = document.querySelectorAll(sel);
   const last = ${LAST_RESPONSE_EL};
   const text = last ? ${TEXT_OF("last")} : '';
+  const idx = last ? Array.prototype.indexOf.call(els, last) : -1;
   const g = ${generatingSel ? `document.querySelector(${JSON.stringify(generatingSel)})` : "null"};
   const generating = !!g && (g.offsetWidth > 0 || g.offsetHeight > 0 || g.tagName === 'DIV');
-  return JSON.stringify({ count: els.length, length: text.length, text: text.slice(0, 20000), generating });
+  return JSON.stringify({ count: els.length, idx, length: text.length, text: text.slice(0, 20000), generating });
 })()`;
 
 /** 마지막 응답 컨테이너의 HTML (마크다운 변환용) */

@@ -24,6 +24,8 @@ export function VerdictCard() {
   const result = usePipelineResult((s) => s.result);
   const judge = usePipelineResult((s) => s.judge);
   const close = usePipelineResult((s) => s.set);
+  const revise = usePipelineResult((s) => s.revise);
+  const revising = usePipelineResult((s) => s.revising);
   const services = useStage((s) => s.services);
   const setMaximized = useStage((s) => s.setMaximized);
   const maximized = useStage((s) => s.maximized);
@@ -43,9 +45,19 @@ export function VerdictCard() {
           {` · ${preset ? preset.name + " · " : ""}${depthOf(result.depth).label}`}
           {result.skipped.length > 0 && ` · 생략 ${result.skipped.map(name).join(", ")}`}
         </span>
+        {!result.revised && result.verifiersSent > 0 && (
+          <button
+            onClick={() => void revise()}
+            disabled={revising}
+            className="ml-auto rounded border border-emerald-400/40 px-2 py-0.5 text-emerald-200 hover:bg-emerald-400/15 disabled:opacity-40"
+            title="검증 판정을 생성 패널의 같은 대화에 보내 지적을 반영한 수정본을 받습니다 (전송 1회)"
+          >
+            {revising ? "수정본 작성 중…" : "지적 반영 수정본 요청"}
+          </button>
+        )}
         <button
           onClick={() => setMaximized(maximized === result.generator ? null : result.generator)}
-          className="ml-auto rounded px-2 py-0.5 text-white/60 hover:bg-white/10 hover:text-white/90"
+          className={(result.revised || result.verifiersSent === 0 ? "ml-auto " : "") + "rounded px-2 py-0.5 text-white/60 hover:bg-white/10 hover:text-white/90"}
           title="판정을 먼저 읽고 나서 생성 답변 원문을 크게 봅니다"
         >
           {maximized === result.generator ? "원문 닫기" : "생성 원문 크게 보기"}
@@ -101,6 +113,16 @@ export function VerdictCard() {
           </div>
         ))}
       </div>
+      {(result.revised || result.reviseError) && (
+        <div className="rounded-lg border border-emerald-400/30 bg-emerald-400/5 p-2">
+          <div className="flex items-center gap-2 text-xs">
+            <span className="font-medium text-emerald-200">수정본 ({name(result.generator)})</span>
+            {result.reviseError && <span className="text-rose-300">{result.reviseError}</span>}
+            {result.revised && <span className="text-white/40">{result.revised.length.toLocaleString()}자 · 전문은 생성 패널에서</span>}
+          </div>
+          {result.revised && <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs text-white/75">{result.revised.slice(0, 600)}</p>}
+        </div>
+      )}
     </div>
   );
 }

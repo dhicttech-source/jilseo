@@ -50,6 +50,8 @@ export const isBroadcastTarget = (d: ServiceDef) => d.kind !== "web";
 export interface ResponseSnapshot {
   count: number;
   text: string;
+  /** 읽은 응답 요소의 위치 (셀렉터 매칭 목록 안 index, 없으면 -1) */
+  idx: number;
 }
 
 /** 미실측 셀렉터 표기 규칙 (지시문 §9): `TODO(selector)`, `TODO(web)` 등 */
@@ -144,12 +146,12 @@ export class ServiceAdapter {
   /** 전송 직전의 응답 DOM 스냅샷. 기존 대화의 마지막 응답을 새 응답으로 오인하지 않기 위한 기준점. */
   async snapshotResponse(): Promise<ResponseSnapshot> {
     const sel = this.def.selectors.response;
-    if (isTodoSelector(sel)) return { count: 0, text: "" };
+    if (isTodoSelector(sel)) return { count: 0, text: "", idx: -1 };
     try {
-      const r = await evalInPanel<{ count: number; text: string }>(this.id, readResponseJs(sel), 3000);
-      return { count: r.count, text: r.text };
+      const r = await evalInPanel<{ count: number; text: string; idx: number }>(this.id, readResponseJs(sel), 3000);
+      return { count: r.count, text: r.text, idx: r.idx ?? -1 };
     } catch {
-      return { count: 0, text: "" };
+      return { count: 0, text: "", idx: -1 };
     }
   }
 
@@ -163,7 +165,7 @@ export class ServiceAdapter {
     opts: { quietMs?: number; pollMs?: number; maxMs?: number; signal?: AbortSignal; baseline?: ResponseSnapshot } = {},
   ): Promise<string> {
     const genSel = isTodoSelector(this.def.selectors.generating) ? undefined : this.def.selectors.generating;
-    const { quietMs = genSel ? 3000 : 8000, pollMs = 700, maxMs = 180_000, signal, baseline = { count: 0, text: "" } } = opts;
+    const { quietMs = genSel ? 3000 : 8000, pollMs = 700, maxMs = 180_000, signal, baseline = { count: 0, text: "", idx: -1 } } = opts;
     const sel = this.def.selectors.response;
     if (isTodoSelector(sel)) return Promise.resolve("");
     if (import.meta.env.DEV) resetProbe(this.id);
@@ -172,13 +174,15 @@ export class ServiceAdapter {
       let last = "";
       let lastChange = Date.now();
       let seen = false;
-      const isNew = (r: { count: number; text: string }) =>
-        r.text.length > 0 && (r.count > baseline.count || r.text !== baseline.text);
+      // 새 응답 = 기준보다 뒤에 있는 요소에 내용이 생겼거나, 같은 요소의 내용이 바뀐 것.
+      // 요소 수 증가만으로는 판정하지 않는다 — 새 요소가 아직 비어 있으면 "비어 있지 않은 마지막 요소"가 옛 응답을 가리킨다(Gemini에서 실제 발생).
+      const isNew = (r: { count: number; text: string; idx: number }) =>
+        r.text.length > 0 && (r.idx > baseline.idx || r.text !== baseline.text);
       const tick = async () => {
         if (signal?.aborted) return resolve(last);
         if (import.meta.env.DEV) await probeGenerating(this.id); // 생성 중 표시 실측 (개발 빌드만)
         try {
-          const r = await evalInPanel<{ count: number; length: number; text: string; generating: boolean }>(
+          const r = await evalInPanel<{ count: number; idx: number; length: number; text: string; generating: boolean }>(
             this.id,
             readResponseJs(sel, genSel),
             3000,

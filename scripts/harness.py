@@ -9,6 +9,7 @@
       scripts/harness.py '{"type":"set_depth","depth":"standard"}'       # quick|standard|deep
       scripts/harness.py '{"type":"pipeline","text":"질서 파이프라인 테스트 1"}' 480
       scripts/harness.py '{"type":"judge","serviceId":"claude","judged":"right"}'
+      scripts/harness.py '{"type":"revise"}' 300                          # 마지막 결과의 판정을 생성 패널에 되돌려 수정본
 """
 import json, os, sys, time, uuid
 D = os.path.expanduser("~/Library/Application Support/jilseo")

@@ -4,7 +4,7 @@
  * import.meta.env.DEV 에서만 시작되므로 dmg(프로덕션)에는 동작하지 않는다.
  *
  * dev_commands.json: { "id": "c1", "type": "broadcast", "text": "..." }
- * types: status | broadcast | pipeline | last_pipeline | set_mode | set_role | set_lens | apply_preset | set_depth | judge | diagnose | memo | apply_stage | set_columns
+ * types: status | broadcast | pipeline | last_pipeline | revise | set_mode | set_role | set_lens | apply_preset | set_depth | judge | diagnose | memo | apply_stage | set_columns
  *        | maximize | select_in_panel | eval | attach | add_web_slot | remove_web_slot
  */
 import { readStore, writeStore } from "./store";
@@ -67,6 +67,8 @@ async function execute(cmd: Command): Promise<unknown> {
       return {
         ...r,
         steps,
+        revised: r.revised?.slice(0, 600),
+        revisedLen: r.revised?.length ?? 0,
         verifiers: r.verifiers.map((v) => ({ ...v, lens: v.lens.id, text: v.text.slice(0, 400) })),
       };
     }
@@ -75,6 +77,11 @@ async function execute(cmd: Command): Promise<unknown> {
     case "last_pipeline": {
       const r = usePipelineResult.getState().result;
       return r ? { ...r, verifiers: r.verifiers.map((v) => ({ ...v, lens: v.lens.id, text: v.text.slice(0, 400) })) } : null;
+    }
+    case "revise": {
+      await usePipelineResult.getState().revise();
+      const r = usePipelineResult.getState().result;
+      return r ? { rowId: r.rowId, revised: r.revised?.slice(0, 600) ?? null, revisedLen: r.revised?.length ?? 0, reviseError: r.reviseError ?? null } : null;
     }
     case "apply_preset": {
       const app = stage.applyPresetToStage(String(cmd.presetId));
