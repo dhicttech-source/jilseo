@@ -180,13 +180,13 @@ export class ServiceAdapter {
         r.text.length > 0 && (r.idx > baseline.idx || r.text !== baseline.text);
       const tick = async () => {
         if (signal?.aborted) return resolve(last);
-        if (import.meta.env.DEV) await probeGenerating(this.id); // 생성 중 표시 실측 (개발 빌드만)
         try {
           const r = await evalInPanel<{ count: number; idx: number; length: number; text: string; generating: boolean }>(
             this.id,
             readResponseJs(sel, genSel),
             3000,
           );
+          if (import.meta.env.DEV) await probeGenerating(this.id, r.generating); // 생성 중 표시 실측 (개발 빌드만)
           if (r.generating) lastChange = Date.now(); // 생성 중 표시가 있으면 텍스트가 멈춰 있어도 활동으로 본다
           if (!isNew(r)) {
             // 아직 새 응답이 없음(기존 응답 그대로 또는 빈 자리표시자)

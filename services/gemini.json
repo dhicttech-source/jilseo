@@ -9,7 +9,7 @@
     "response": "message-content",
     "fileMenu": "button[aria-label=\"업로드 및 도구\"], button[aria-label=\"Upload files and tools\"], button[aria-label*=\"업로드\"]",
     "fileInput": "input.hidden-file-input",
-    "generating": "TODO(selector)"
+    "generating": "button[aria-label=\"대답 생성 중지\"]"
   },
   "verified": "2026-09-10 라이브 DOM 실측 완료: input·send·response·fileMenu→fileInput(업로드 메뉴를 열면 hidden-file-input 생성). 첫 Broadcast 응답 수집 확인"
 }

@@ -34,7 +34,7 @@
 - 하네스 `set_lens`, `judge`, `last_pipeline`(읽기 전용 명령은 긴 명령 중에도 실행); vitest 파서·렌즈 해석 테스트 14건
 
 ### Fixed (2026-09-30)
-- 검색·도구 호출로 응답이 몇 초 멈추는 구간을 "응답 완료"로 오인해 잘린 답변을 검증에 넘기던 문제(Claude·Perplexity에서 실측). 서비스 JSON에 `generating` 셀렉터(중지 버튼·스트리밍 속성)를 추가하고, 그 요소가 사라진 뒤에만 완료로 본다. 미실측(TODO)이면 정적 대기 3초 → 8초. 실측 완료: ChatGPT `button[data-testid="stop-button"]`, Claude `div[data-is-streaming="true"]`, Perplexity `button[aria-label^="응답 중지"]`. Gemini·Grok은 TODO(Gemini는 생각 중 "지금 답변하기" 버튼만 관찰됨, 중지 버튼 미확인)
+- 검색·도구 호출로 응답이 몇 초 멈추는 구간을 "응답 완료"로 오인해 잘린 답변을 검증에 넘기던 문제(Claude·Perplexity에서 실측). 서비스 JSON에 `generating` 셀렉터(중지 버튼·스트리밍 속성)를 추가하고, 그 요소가 사라진 뒤에만 완료로 본다. 미실측(TODO)이면 정적 대기 3초 → 8초. 실측 완료: ChatGPT `button[data-testid="stop-button"]`, Claude `div[data-is-streaming="true"]`, Perplexity `button[aria-label^="응답 중지"]`, Gemini `button[aria-label="대답 생성 중지"]`(전송 직후부터 응답 완료까지 존재, 2회 실측·관찰 경로에서 켜짐/꺼짐 확인). Grok만 TODO
 - 응답 컨테이너 선택 규칙 변경: 뒤에서부터 텍스트가 비어 있지 않은 첫 요소를 고르고(Gemini는 끝에 빈 `message-content`가 붙어 관찰이 180초 상한까지 늘어짐), 그 요소를 포함하는 가장 바깥 매칭 요소를 쓴다(Claude는 스트리밍 중 내부 조각이 걸려 답변을 1글자로 읽음). 마크다운 변환에서 `.sr-only`(Claude의 "Claude 응답:" 낭독용 제목) 제거
 - 개발 하네스: 결과 파일에 최근 20건 `recent` 맵 유지(동시 실행 명령이 결과를 덮어 사라지던 문제), 클라이언트가 앞 명령 소비를 기다린 뒤 명령 파일을 씀(한 칸짜리 명령 파일 덮어쓰기), 관찰 중 "생성 중" 요소 실측 기록(`probes` 명령, 개발 빌드만)
 
