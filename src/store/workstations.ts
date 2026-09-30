@@ -17,6 +17,8 @@ export interface Workstation {
   /** 전송 모드와 파이프라인 역할 (없으면 동시 전송·기본 역할). 워크스테이션이 곧 파이프라인 프리셋 */
   mode?: SendMode;
   roles?: RoleMap;
+  /** 검증 패널 → 렌즈 id */
+  lensAssign?: Record<string, string>;
   createdAt: number;
   updatedAt: number;
 }
@@ -47,7 +49,7 @@ export const useWorkstations = create<WorkstationsState>((set, get) => ({
 
   /** 현재 스테이지 구성 + 각 패널의 대화 URL을 캡처 */
   async saveCurrent(name, id) {
-    const { stage, columns, mode, roles } = useStage.getState();
+    const { stage, columns, mode, roles, lensAssign } = useStage.getState();
     const panels: WorkstationPanel[] = await Promise.all(
       stage.map(async (serviceId) => ({
         serviceId,
@@ -63,6 +65,7 @@ export const useWorkstations = create<WorkstationsState>((set, get) => ({
       columns,
       mode,
       roles,
+      lensAssign,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -89,7 +92,7 @@ export const useWorkstations = create<WorkstationsState>((set, get) => ({
       ws.panels.map((p) => p.serviceId),
       ws.columns,
     );
-    stageStore.restorePipeline(ws.mode, ws.roles);
+    stageStore.restorePipeline(ws.mode, ws.roles, ws.lensAssign);
   },
 
   async remove(id) {

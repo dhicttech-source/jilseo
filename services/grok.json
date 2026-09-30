@@ -7,7 +7,8 @@
     "input": "div.tiptap[contenteditable=\"true\"], div[aria-label=\"Ask Grok anything\"]",
     "send": "button[data-testid=\"chat-submit\"]",
     "response": "div[data-testid=\"assistant-message\"]",
-    "fileInput": "input[type=\"file\"]"
+    "fileInput": "input[type=\"file\"]",
+    "generating": "TODO(selector)"
   },
   "verified": "2026-09-10 라이브 DOM 실측 완료: input·send(chat-submit)·fileInput·response(assistant-message). 토큰 응답 수집 확인. 최초 1회 '나이 확인' 모달은 사용자가 처리"
 }

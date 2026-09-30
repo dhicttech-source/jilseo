@@ -94,7 +94,7 @@
 
 | 단계 | 내용 | 코드 영향 | 규모 |
 |---|---|---|---|
-| A. 렌즈 라이브러리 | 내장 렌즈 7개 + 사용자 렌즈, 검증 패널마다 렌즈 배정(역할 칩 옆 렌즈 선택), 판정 블록 파싱·저장, 워크스테이션에 렌즈 배정 저장 | `verifyPrompt.ts`(렌즈 정의·파서), `roles.ts`(verify에 lensId), `pipeline.ts`(패널별 프롬프트), `stage.ts`/`workstations.ts`(저장), `PanelSlot.tsx`(렌즈 칩), `SettingsView.tsx`(렌즈 편집) | 중 |
+| A. 렌즈 라이브러리 (구현 2026-09-30) | 내장 렌즈 7개 + 사용자 렌즈, 검증 패널마다 렌즈 배정(역할 칩 옆 렌즈 선택), 판정 블록 파싱·저장, 워크스테이션에 렌즈 배정 저장 | `verifyPrompt.ts`(렌즈 정의·파서), `roles.ts`(verify에 lensId), `pipeline.ts`(패널별 프롬프트), `stage.ts`/`workstations.ts`(저장), `PanelSlot.tsx`(렌즈 칩), `SettingsView.tsx`(렌즈 편집) | 중 |
 | B. 프리셋·깊이·요약 카드 | 프리셋 5종 내장(워크스테이션 템플릿), 깊이 선택, 완료 시 요약 카드, 검증 패널 표시 순서 정렬 | `BroadcastBar.tsx`, 새 `VerdictCard.tsx`, `stage.ts` | 중 |
 | C. 수정 단계 | 심층 깊이에서 판정 → 생성 패널 재전송 | `pipeline.ts` | 소 |
 | D. 성적표 | 프리셋(렌즈)×모델 매트릭스: 맞는 지적 비율, 등급 일치율, 평균 심각 지적 수. 일정량 쌓이면 전송 바에 배정 "추천"(자동 라우팅 아님) | 새 `Scorecard.tsx`, 집계 함수(`src/lib/scorecard.ts`, Supabase 조회 또는 로컬 캐시) | 중 |

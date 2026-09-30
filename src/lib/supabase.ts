@@ -66,7 +66,8 @@ export type QueueTable = "prompts" | "notes" | "comparisons";
 interface QueueItem {
   id: string;
   table: QueueTable;
-  op: "insert" | "delete";
+  op: "insert" | "update" | "delete";
+  /** insert: 행 전체, update: { id, ...patch }, delete: { id } */
   row: Record<string, unknown>;
   at: number;
 }
@@ -128,6 +129,22 @@ export async function deleteOrQueue(cfg: SupabaseConfig | null, table: QueueTabl
   return "queued";
 }
 
+/** 부분 갱신 시도 → 실패면 큐 (insert가 큐에 남아 있어도 순서대로 재시도되므로 나중에 적용된다) */
+export async function updateOrQueue(
+  cfg: SupabaseConfig | null,
+  table: QueueTable,
+  id: string,
+  patch: Record<string, unknown>,
+): Promise<"saved" | "queued"> {
+  const c = getClient(cfg);
+  if (c) {
+    const { error } = await c.from(table).update(patch).eq("id", id);
+    if (!error) return "saved";
+  }
+  await enqueue({ table, op: "update", row: { id, ...patch } });
+  return "queued";
+}
+
 /** 큐 재시도. 성공한 항목만 제거. 반환: 남은 개수 */
 export async function flushQueue(cfg: SupabaseConfig | null): Promise<number> {
   const c = getClient(cfg);
@@ -137,12 +154,19 @@ export async function flushQueue(cfg: SupabaseConfig | null): Promise<number> {
   if (!data.session) return q.length;
   const remaining: QueueItem[] = [];
   for (const item of q) {
-    const res =
-      item.op === "insert"
-        ? await c.from(item.table).insert(item.row)
-        : await c.from(item.table).delete().eq("id", String(item.row.id));
+    const res = await replay(c, item);
     if (res.error) remaining.push(item);
   }
   await writeStore("queue", remaining);
   return remaining.length;
+}
+
+/** 큐 항목 1건을 종류대로 다시 보낸다 */
+function replay(c: SupabaseClient, item: QueueItem) {
+  if (item.op === "insert") return c.from(item.table).insert(item.row);
+  if (item.op === "update") {
+    const { id, ...patch } = item.row;
+    return c.from(item.table).update(patch).eq("id", String(id));
+  }
+  return c.from(item.table).delete().eq("id", String(item.row.id));
 }

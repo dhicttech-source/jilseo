@@ -2,7 +2,7 @@ import { useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { invoke } from "@tauri-apps/api/core";
 import { useCloud } from "../store/cloud";
-import { DEFAULT_VERIFY_TEMPLATE } from "../lib/verifyPrompt";
+import { BUILTIN_LENSES, VERDICT_BLOCK, resolveLens } from "../lib/lenses";
 import { UI_SCALES, useStage } from "../store/stage";
 
 const input = "rounded border border-white/15 bg-white/5 px-2 py-1.5 text-sm text-white/90 outline-none focus:border-white/40";
@@ -28,8 +28,16 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
   const uiScale = useStage((s) => s.uiScale);
   const setUiScale = useStage((s) => s.setUiScale);
   const setNewChatAfterFile = useStage((s) => s.setNewChatAfterFile);
-  const verifyTemplate = useStage((s) => s.verifyTemplate);
-  const setVerifyTemplate = useStage((s) => s.setVerifyTemplate);
+  const lensOverrides = useStage((s) => s.lensOverrides);
+  const customLenses = useStage((s) => s.customLenses);
+  const setLensOverride = useStage((s) => s.setLensOverride);
+  const addCustomLens = useStage((s) => s.addCustomLens);
+  const removeCustomLens = useStage((s) => s.removeCustomLens);
+  const [lensId, setLensId] = useState(BUILTIN_LENSES[0].id);
+  const [newLensName, setNewLensName] = useState("");
+  const allLenses = [...BUILTIN_LENSES, ...customLenses];
+  const lens = resolveLens(lensId, lensOverrides, customLenses);
+  const overridden = !!lensOverrides[lens.id];
   const cloud = useCloud();
   const [url, setUrl] = useState(supabase?.url ?? "");
   const [anonKey, setAnonKey] = useState(supabase?.anonKey ?? "");
@@ -175,26 +183,78 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
         </section>
 
         <section className="flex flex-col gap-3 rounded-lg border border-white/10 p-4">
-          <h2 className="text-sm font-medium text-white/85">생성 → 검증 파이프라인</h2>
+          <h2 className="text-sm font-medium text-white/85">검증 렌즈 (생성 → 검증 파이프라인)</h2>
           <p className="text-xs text-white/40">
-            전송 바의 "생성→검증" 모드에서 검증 패널에 보내는 템플릿입니다. <code className="text-white/60">{"{question}"}</code>은 원래 질문,{" "}
-            <code className="text-white/60">{"{answer}"}</code>는 생성 패널의 답변으로 바뀝니다. 역할(생성/검증/제외)은 패널 헤더의 칩으로 정하고 워크스테이션에 함께 저장됩니다.
+            검증 패널마다 렌즈 하나를 배정합니다(패널 헤더의 역할 칩 옆). 렌즈는 방법론 템플릿이고{" "}
+            <code className="text-white/60">{"{question}"}</code>·<code className="text-white/60">{"{answer}"}</code>가 질문과 생성 답변으로 바뀝니다.
+            모든 렌즈 끝에는 같은 판정 블록이 자동으로 붙어 요약 카드가 등급·건수·핵심을 읽습니다.
           </p>
-          <Field label="검증 템플릿">
+          <div className="flex flex-wrap gap-1">
+            {allLenses.map((l) => (
+              <button
+                key={l.id}
+                onClick={() => setLensId(l.id)}
+                title={l.description}
+                className={
+                  "rounded-full border px-2.5 py-1 text-xs " +
+                  (l.id === lens.id ? "border-white/40 bg-white/15 text-white/90" : "border-white/10 text-white/50 hover:text-white/80")
+                }
+              >
+                {l.icon} {l.name}
+                {lensOverrides[l.id] ? " *" : ""}
+              </button>
+            ))}
+          </div>
+          <div className="text-xs text-white/50">
+            {lens.description}
+            {lens.recommended.length > 0 && ` · 권장: ${lens.recommended.join(", ")}`}
+          </div>
+          <Field label={`${lens.name} 템플릿${overridden ? " (수정됨)" : ""}`}>
             <textarea
-              value={verifyTemplate}
-              onChange={(e) => setVerifyTemplate(e.target.value)}
-              rows={10}
+              value={lens.template}
+              onChange={(e) => setLensOverride(lens.id, e.target.value)}
+              rows={12}
               className={input + " resize-y font-mono"}
             />
           </Field>
-          <button
-            onClick={() => setVerifyTemplate(DEFAULT_VERIFY_TEMPLATE)}
-            disabled={verifyTemplate === DEFAULT_VERIFY_TEMPLATE}
-            className="self-start rounded bg-white/10 px-3 py-1 text-xs text-white/80 disabled:opacity-30"
-          >
-            기본 템플릿으로 되돌리기
-          </button>
+          <div className="flex flex-wrap items-center gap-2">
+            {lens.builtin ? (
+              <button
+                onClick={() => setLensOverride(lens.id, "")}
+                disabled={!overridden}
+                className="rounded bg-white/10 px-3 py-1 text-xs text-white/80 disabled:opacity-30"
+              >
+                기본 템플릿으로 되돌리기
+              </button>
+            ) : (
+              <button onClick={() => { removeCustomLens(lens.id); setLensId(BUILTIN_LENSES[0].id); }} className="rounded bg-rose-500/20 px-3 py-1 text-xs text-rose-200">
+                이 렌즈 삭제
+              </button>
+            )}
+            <span className="ml-auto flex items-center gap-1">
+              <input
+                value={newLensName}
+                onChange={(e) => setNewLensName(e.target.value)}
+                placeholder="새 렌즈 이름"
+                className={input + " w-32"}
+              />
+              <button
+                onClick={() => {
+                  const id = addCustomLens(newLensName, `[질문]\n{question}\n\n[답변]\n{answer}\n\n검토 지시를 여기에 쓰세요.`);
+                  setNewLensName("");
+                  setLensId(id);
+                }}
+                disabled={!newLensName.trim()}
+                className="rounded bg-white/10 px-3 py-1 text-xs text-white/80 disabled:opacity-30"
+              >
+                추가
+              </button>
+            </span>
+          </div>
+          <details className="text-xs text-white/40">
+            <summary className="cursor-pointer">모든 렌즈에 붙는 판정 블록 보기</summary>
+            <pre className="mt-1 whitespace-pre-wrap font-mono text-white/50">{VERDICT_BLOCK}</pre>
+          </details>
         </section>
 
         <section className="flex flex-col gap-2 rounded-lg border border-white/10 p-4">

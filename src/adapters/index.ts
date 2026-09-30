@@ -26,6 +26,8 @@ export interface ServiceDef {
     fileInput?: string;
     /** fileInput이 메뉴를 열어야 생기는 경우(Gemini) 먼저 클릭할 버튼 */
     fileMenu?: string;
+    /** 생성 중에만 존재하는 요소(중지 버튼·스트리밍 속성). 있으면 사라질 때까지 완료로 보지 않는다. 미실측이면 TODO */
+    generating?: string;
   };
   verified?: string;
   /** "web": 웹슬롯(일반 URL). Broadcast 대상에서 제외 */
@@ -151,14 +153,16 @@ export class ServiceAdapter {
   }
 
   /**
-   * 응답 관찰. baseline(전송 전 스냅샷)과 다른 새 응답이 나타난 뒤 3초간 변화가 없으면 done.
-   * cb는 변화가 있을 때만 호출.
+   * 응답 관찰. baseline(전송 전 스냅샷)과 다른 새 응답이 나타난 뒤 quietMs 동안 변화가 없고,
+   * "생성 중" 표시(selectors.generating)도 없으면 done. 검색·도구 호출로 텍스트가 몇 초씩 멈추는 구간 대비:
+   * generating 셀렉터가 실측된 서비스는 3초, 미실측이면 8초를 기다린다. cb는 변화가 있을 때만 호출.
    */
   observeResponse(
     cb: (text: string, done: boolean) => void,
     opts: { quietMs?: number; pollMs?: number; maxMs?: number; signal?: AbortSignal; baseline?: ResponseSnapshot } = {},
   ): Promise<string> {
-    const { quietMs = 3000, pollMs = 700, maxMs = 180_000, signal, baseline = { count: 0, text: "" } } = opts;
+    const genSel = isTodoSelector(this.def.selectors.generating) ? undefined : this.def.selectors.generating;
+    const { quietMs = genSel ? 3000 : 8000, pollMs = 700, maxMs = 180_000, signal, baseline = { count: 0, text: "" } } = opts;
     const sel = this.def.selectors.response;
     if (isTodoSelector(sel)) return Promise.resolve("");
     return new Promise((resolve) => {
@@ -171,11 +175,12 @@ export class ServiceAdapter {
       const tick = async () => {
         if (signal?.aborted) return resolve(last);
         try {
-          const r = await evalInPanel<{ count: number; length: number; text: string }>(
+          const r = await evalInPanel<{ count: number; length: number; text: string; generating: boolean }>(
             this.id,
-            readResponseJs(sel),
+            readResponseJs(sel, genSel),
             3000,
           );
+          if (r.generating) lastChange = Date.now(); // 생성 중 표시가 있으면 텍스트가 멈춰 있어도 활동으로 본다
           if (!isNew(r)) {
             // 아직 새 응답이 없음(기존 응답 그대로 또는 빈 자리표시자)
           } else if (r.text !== last) {
@@ -183,7 +188,7 @@ export class ServiceAdapter {
             lastChange = Date.now();
             seen = true;
             cb(last, false);
-          } else if (seen && Date.now() - lastChange >= quietMs) {
+          } else if (seen && !r.generating && Date.now() - lastChange >= quietMs) {
             cb(last, true);
             return resolve(last);
           }

@@ -6,6 +6,7 @@ import { Onboarding } from "./app/Onboarding";
 import { PromptLibrary } from "./app/PromptLibrary";
 import { SettingsView } from "./app/SettingsView";
 import { Stage } from "./app/Stage";
+import { VerdictCard } from "./app/VerdictCard";
 import { WorkstationBar } from "./app/WorkstationBar";
 import { useCloud } from "./store/cloud";
 import { useLibrary } from "./store/library";
@@ -111,6 +112,7 @@ export default function App() {
         <>
           {libraryOpen && <PromptLibrary />}
           <Dock />
+          <VerdictCard />
           <BroadcastBar />
         </>
       )}

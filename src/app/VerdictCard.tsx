@@ -1,0 +1,91 @@
+import { GRADE_LABEL, type Grade, type Judged } from "../lib/lenses";
+import { usePipelineResult } from "../store/pipelineResult";
+import { useStage } from "../store/stage";
+
+const GRADE_CLASS: Record<Grade, string> = {
+  trust: "bg-emerald-400/20 text-emerald-200",
+  revise: "bg-amber-400/20 text-amber-200",
+  distrust: "bg-rose-400/20 text-rose-200",
+  unknown: "bg-white/10 text-white/50",
+};
+
+const JUDGE: { key: Judged; label: string; on: string }[] = [
+  { key: "right", label: "맞는 지적", on: "bg-emerald-400/30 text-emerald-100" },
+  { key: "wrong", label: "틀린 지적", on: "bg-rose-400/30 text-rose-100" },
+  { key: "hold", label: "보류", on: "bg-white/25 text-white/90" },
+];
+
+/**
+ * 파이프라인 완료 후 전송 바 위에 뜨는 요약 카드. 판정을 원문보다 먼저 보게 하고(SCREEN의 Stop),
+ * 판정마다 사람의 채택을 한 번 클릭으로 남긴다 (성적표의 원재료).
+ */
+export function VerdictCard() {
+  const result = usePipelineResult((s) => s.result);
+  const judge = usePipelineResult((s) => s.judge);
+  const close = usePipelineResult((s) => s.set);
+  const services = useStage((s) => s.services);
+  if (!result) return null;
+  const name = (id: string) => services.find((x) => x.id === id)?.name ?? id;
+
+  return (
+    <div className="flex shrink-0 flex-col gap-2 border-t border-white/10 bg-white/[0.03] px-3 py-2 text-sm">
+      <div className="flex items-center gap-2 text-white/60">
+        <span className="font-medium text-white/85">판정 요약</span>
+        <span>
+          {name(result.generator)} 생성 → 검증 {result.verifiersSent}/{result.verifiersTotal} · {Math.round(result.ms / 1000)}s
+          {result.saved !== "skipped" && ` · 기록 ${result.saved === "saved" ? "저장" : "큐"}`}
+        </span>
+        <button onClick={() => close(null)} className="ml-auto rounded px-2 py-0.5 text-white/50 hover:bg-white/10 hover:text-white/90" title="닫기">
+          ✕
+        </button>
+      </div>
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(1, result.verifiers.length)}, minmax(0, 1fr))` }}>
+        {result.verifiers.map((v) => (
+          <div key={v.serviceId} className="flex min-w-0 flex-col gap-1 rounded-lg border border-white/10 p-2">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-white/85">{name(v.serviceId)}</span>
+              <span className="text-xs text-white/50" title={v.lens.description}>
+                {v.lens.icon} {v.lens.name}
+              </span>
+              <span className={"ml-auto rounded px-1.5 py-0.5 text-xs " + GRADE_CLASS[v.sent ? v.verdict.grade : "unknown"]}>
+                {v.sent ? GRADE_LABEL[v.verdict.grade] : "전송 실패"}
+              </span>
+            </div>
+            {v.sent && v.verdict.parsed && (
+              <div className="text-xs text-white/45">
+                심각 {v.verdict.counts.severe} · 보통 {v.verdict.counts.normal} · 경미 {v.verdict.counts.minor}
+              </div>
+            )}
+            {v.verdict.headline.length > 0 ? (
+              <ul className="list-disc pl-4 text-xs text-white/75">
+                {v.verdict.headline.map((h, i) => (
+                  <li key={i} className="truncate" title={h}>
+                    {h}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              v.sent && <div className="text-xs text-white/40">판정 블록 없음 · 패널에서 원문 확인</div>
+            )}
+            {v.sent && (
+              <div className="mt-auto flex gap-1 pt-1">
+                {JUDGE.map((j) => (
+                  <button
+                    key={j.key}
+                    onClick={() => void judge(v.serviceId, j.key)}
+                    className={
+                      "rounded px-2 py-0.5 text-xs " +
+                      (v.verdict.judged === j.key ? j.on : "bg-white/5 text-white/50 hover:bg-white/15 hover:text-white/85")
+                    }
+                  >
+                    {j.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}

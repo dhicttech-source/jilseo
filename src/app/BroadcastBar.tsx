@@ -1,11 +1,12 @@
 import { useRef, useState } from "react";
 import { isBroadcastTarget } from "../adapters";
 import { runBroadcast } from "../lib/broadcast";
-import { runPipeline } from "../lib/pipeline";
+import { lensFor, runPipeline } from "../lib/pipeline";
 import { resolvePipelineRoles } from "../lib/roles";
 import { MAX_ATTACHMENT_BYTES, useAttachment } from "../store/attachment";
 import { useDraft } from "../store/draft";
 import { useLibrary } from "../store/library";
+import { usePipelineResult } from "../store/pipelineResult";
 import { useStage } from "../store/stage";
 
 export function BroadcastBar() {
@@ -35,8 +36,11 @@ export function BroadcastBar() {
   const mode = useStage((s) => s.mode);
   const setMode = useStage((s) => s.setMode);
   const roles = useStage((s) => s.roles);
+  const lensAssign = useStage((s) => s.lensAssign);
+  const setResult = usePipelineResult((s) => s.set);
   const pipeline = mode === "pipeline";
   const resolved = resolvePipelineRoles(stage, roles, services);
+  void lensAssign; // 렌즈 배정이 바뀌면 placeholder를 다시 그린다
 
   const targets = stage
     .map((id) => services.find((s) => s.id === id))
@@ -48,18 +52,17 @@ export function BroadcastBar() {
     : pipeline
       ? resolved.error
         ? `파이프라인: ${resolved.error} (패널 헤더의 역할 칩으로 지정)`
-        : `${resolved.generator?.name} 생성 → ${resolved.verifiers.map((v) => v.name).join(" · ")} 검증  (⌘⏎)`
+        : `${resolved.generator?.name} 생성 → ${resolved.verifiers.map((v) => `${v.name}(${lensFor(v.id).name})`).join(" · ")} 검증  (⌘⏎)`
       : `${targets.map((t) => t.name).join(" · ")} 에게 동시에 보내기  (⌘⏎)`;
 
   const sendPipeline = async (body: string) => {
     setSummary("생성 중…");
     setText("");
+    setResult(null);
     try {
       const r = await runPipeline(body, (_step, detail) => setSummary(detail));
-      setSummary(
-        `생성 ${services.find((x) => x.id === r.generator)?.name ?? r.generator} → 검증 ${r.verifiersSent}/${r.verifiersTotal} · ${Math.round(r.ms / 1000)}s` +
-          (r.saved !== "skipped" ? ` · 비교 기록 ${r.saved === "saved" ? "저장" : "큐"}` : ""),
-      );
+      setResult(r); // 요약 카드(VerdictCard)가 판정과 채택 버튼을 보여 준다
+      setSummary(`검증 ${r.verifiersSent}/${r.verifiersTotal} · ${Math.round(r.ms / 1000)}s`);
     } catch (e) {
       setSummary(`파이프라인 실패: ${e instanceof Error ? e.message : String(e)}`);
       setText(body); // 실패하면 입력을 되돌려 다시 시도할 수 있게

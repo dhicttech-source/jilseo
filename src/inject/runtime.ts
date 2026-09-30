@@ -117,11 +117,17 @@ export const clearInputJs = (inputSel: string) => `(() => {
 })()`;
 
 /** 마지막 응답 컨테이너의 텍스트 스냅샷 (완료 판정은 앱 쪽 폴링: 3초간 변화 없음) */
-export const readResponseJs = (responseSel: string) => `(() => {
+/**
+ * 마지막 응답 컨테이너의 텍스트. generatingSel이 주어지면 "생성 중" 표시(중지 버튼·스트리밍 속성)가 보이는지도 함께 돌려준다.
+ * 검색·도구 호출로 몇 초씩 멈추는 구간을 "완료"로 오인하지 않기 위한 근거.
+ */
+export const readResponseJs = (responseSel: string, generatingSel?: string) => `(() => {
   const els = document.querySelectorAll(${JSON.stringify(responseSel)});
   const last = els[els.length - 1];
   const text = last ? (last.innerText || '') : '';
-  return JSON.stringify({ count: els.length, length: text.length, text: text.slice(0, 20000) });
+  const g = ${generatingSel ? `document.querySelector(${JSON.stringify(generatingSel)})` : "null"};
+  const generating = !!g && (g.offsetWidth > 0 || g.offsetHeight > 0 || g.tagName === 'DIV');
+  return JSON.stringify({ count: els.length, length: text.length, text: text.slice(0, 20000), generating });
 })()`;
 
 /** 마지막 응답 컨테이너의 HTML (마크다운 변환용) */

@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { ServiceDef } from "../adapters";
 import { createPanel, layoutPanels, navigatePanel, rectOf, setPanelVisible } from "../lib/panels";
 import { saveNoteFor } from "../lib/notes";
+import { BUILTIN_LENSES, COMPOSITE_LENS_ID } from "../lib/lenses";
 import { effectiveRole, nextRole, resolvePipelineRoles, type PanelRole } from "../lib/roles";
 import { useStage } from "../store/stage";
 import { useWorkstations } from "../store/workstations";
@@ -39,7 +40,32 @@ const ROLE_CLASS: Record<PanelRole, string> = {
   off: "border-white/15 text-white/35",
 };
 
-/** 파이프라인 모드에서만 보이는 역할 칩. 클릭하면 생성 → 검증 → 제외 순환 */
+/** 검증 패널의 렌즈 선택. 권장 서비스면 이름 뒤에 ✓ */
+function LensSelect({ serviceId }: { serviceId: string }) {
+  const lensAssign = useStage((s) => s.lensAssign);
+  const customLenses = useStage((s) => s.customLenses);
+  const setLens = useStage((s) => s.setLens);
+  const current = lensAssign[serviceId] ?? COMPOSITE_LENS_ID;
+  const all = [...BUILTIN_LENSES, ...customLenses];
+  const cur = all.find((l) => l.id === current) ?? BUILTIN_LENSES[0];
+  return (
+    <select
+      value={cur.id}
+      onChange={(e) => setLens(serviceId, e.target.value)}
+      title={`검증 렌즈: ${cur.description}`}
+      className="max-w-28 rounded border border-white/15 bg-white/5 px-1 py-0.5 text-xs text-white/80 outline-none"
+    >
+      {all.map((l) => (
+        <option key={l.id} value={l.id} className="bg-[#1a1d24]">
+          {l.icon} {l.name}
+          {l.recommended.includes(serviceId) ? " ✓" : ""}
+        </option>
+      ))}
+    </select>
+  );
+}
+
+/** 파이프라인 모드에서만 보이는 역할 칩. 클릭하면 생성 → 검증 → 제외 순환. 검증이면 렌즈 선택이 따라붙는다 */
 function RoleChip({ serviceId }: { serviceId: string }) {
   const stage = useStage((s) => s.stage);
   const roles = useStage((s) => s.roles);
@@ -47,13 +73,16 @@ function RoleChip({ serviceId }: { serviceId: string }) {
   const setRole = useStage((s) => s.setRole);
   const role = effectiveRole(serviceId, resolvePipelineRoles(stage, roles, services));
   return (
-    <button
-      onClick={() => setRole(serviceId, nextRole(role))}
-      title="파이프라인 역할 (클릭: 생성 → 검증 → 제외)"
-      className={"rounded-full border px-2 py-0.5 text-xs " + ROLE_CLASS[role]}
-    >
-      {ROLE_LABEL[role]}
-    </button>
+    <>
+      <button
+        onClick={() => setRole(serviceId, nextRole(role))}
+        title="파이프라인 역할 (클릭: 생성 → 검증 → 제외)"
+        className={"rounded-full border px-2 py-0.5 text-xs " + ROLE_CLASS[role]}
+      >
+        {ROLE_LABEL[role]}
+      </button>
+      {role === "verify" && <LensSelect serviceId={serviceId} />}
+    </>
   );
 }
 

@@ -4,6 +4,7 @@ import { TODO_SELECTOR_PREFIX, type ServiceDef } from "../adapters";
 import { measureViewportInset } from "../lib/panels";
 import { assignRole, type PanelRole, type RoleMap, type SendMode } from "../lib/roles";
 import { DEFAULT_VERIFY_TEMPLATE } from "../lib/verifyPrompt";
+import { COMPOSITE_LENS_ID, type Lens } from "../lib/lenses";
 
 export type PanelPhase =
   | "creating"
@@ -51,8 +52,14 @@ interface Settings {
   mode?: SendMode;
   /** 파이프라인 역할 배정 (serviceId → 역할). 비어 있으면 첫 AI 패널이 생성, 나머지 검증 */
   roles?: RoleMap;
-  /** 검증 패널에 보낼 템플릿 ({question}, {answer}) */
+  /** (구) 검증 템플릿. 읽을 때 lensOverrides.composite로 이전하고 더 쓰지 않는다 */
   verifyTemplate?: string;
+  /** 검증 패널 → 렌즈 id. 미배정은 종합 렌즈 */
+  lensAssign?: Record<string, string>;
+  /** 내장·사용자 렌즈의 템플릿 덮어쓰기 (렌즈 id → 템플릿) */
+  lensOverrides?: Record<string, string>;
+  /** 사용자 정의 렌즈 */
+  customLenses?: Lens[];
 }
 
 export const UI_SCALES = [1, 1.15, 1.3, 1.5] as const;
@@ -97,6 +104,12 @@ const sanitizeStage = (ids: string[], services: ServiceDef[]) => {
   return ids.filter((id) => known.has(id)).slice(0, MAX_PANELS);
 };
 
+/** 구 설정 verifyTemplate → 종합 렌즈 덮어쓰기. 기본값과 같거나 비었으면 버린다 */
+const migrateVerifyTemplate = (overrides: Record<string, string>, legacy: string | undefined) => {
+  if (!legacy?.trim() || legacy === DEFAULT_VERIFY_TEMPLATE || overrides[COMPOSITE_LENS_ID]) return overrides;
+  return { ...overrides, [COMPOSITE_LENS_ID]: legacy };
+};
+
 interface StageState {
   loaded: boolean;
   services: ServiceDef[];
@@ -117,14 +130,20 @@ interface StageState {
   uiScale: number;
   mode: SendMode;
   roles: RoleMap;
-  verifyTemplate: string;
+  lensAssign: Record<string, string>;
+  lensOverrides: Record<string, string>;
+  customLenses: Lens[];
 
   init(): Promise<void>;
   setMode(mode: SendMode): void;
   setRole(id: string, role: PanelRole): void;
-  /** 워크스테이션 복원용: 모드와 역할을 한 번에 교체 */
-  restorePipeline(mode: SendMode | undefined, roles: RoleMap | undefined): void;
-  setVerifyTemplate(t: string): void;
+  /** 워크스테이션 복원용: 모드·역할·렌즈 배정을 한 번에 교체 */
+  restorePipeline(mode: SendMode | undefined, roles: RoleMap | undefined, lensAssign?: Record<string, string>): void;
+  setLens(serviceId: string, lensId: string): void;
+  /** 템플릿 덮어쓰기. 빈 문자열이면 덮어쓰기 제거(기본 복원) */
+  setLensOverride(lensId: string, template: string): void;
+  addCustomLens(name: string, template: string): string;
+  removeCustomLens(lensId: string): void;
   setNewChatAfterFile(v: boolean): void;
   setUiScale(scale: number): void;
   addWebSlot(url: string, name?: string): string | null;
@@ -144,8 +163,10 @@ let saveTimer: ReturnType<typeof setTimeout> | null = null;
 function persist(get: () => StageState) {
   if (saveTimer) clearTimeout(saveTimer);
   saveTimer = setTimeout(() => {
-    const { stage, columns, maximized, supabase, device, onboarded, webSlots, newChatAfterFile, uiScale, mode, roles, verifyTemplate } =
-      get();
+    const {
+      stage, columns, maximized, supabase, device, onboarded, webSlots, newChatAfterFile, uiScale, mode, roles,
+      lensAssign, lensOverrides, customLenses,
+    } = get();
     const settings: Settings = {
       version: 1,
       stage,
@@ -159,7 +180,9 @@ function persist(get: () => StageState) {
       uiScale,
       mode,
       roles,
-      verifyTemplate,
+      lensAssign,
+      lensOverrides,
+      customLenses,
     };
     invoke("write_settings", { settings }).catch(() => {});
   }, 200);
@@ -184,7 +207,9 @@ export const useStage = create<StageState>((set, get) => ({
   uiScale: DEFAULT_UI_SCALE,
   mode: "broadcast",
   roles: {},
-  verifyTemplate: DEFAULT_VERIFY_TEMPLATE,
+  lensAssign: {},
+  lensOverrides: {},
+  customLenses: [],
 
   async init() {
     const [svcRes, settings, dir, inset] = await Promise.all([
@@ -218,7 +243,9 @@ export const useStage = create<StageState>((set, get) => ({
       uiScale: settings?.uiScale ?? DEFAULT_UI_SCALE,
       mode: settings?.mode === "pipeline" ? "pipeline" : "broadcast",
       roles: settings?.roles ?? {},
-      verifyTemplate: settings?.verifyTemplate?.trim() ? settings.verifyTemplate : DEFAULT_VERIFY_TEMPLATE,
+      lensAssign: settings?.lensAssign ?? {},
+      lensOverrides: migrateVerifyTemplate(settings?.lensOverrides ?? {}, settings?.verifyTemplate),
+      customLenses: settings?.customLenses ?? [],
     });
     applyUiScale(settings?.uiScale ?? DEFAULT_UI_SCALE);
   },
@@ -234,13 +261,41 @@ export const useStage = create<StageState>((set, get) => ({
     persist(get);
   },
 
-  restorePipeline(mode, roles) {
-    set({ mode: mode ?? "broadcast", roles: roles ?? {} });
+  restorePipeline(mode, roles, lensAssign) {
+    set({ mode: mode ?? "broadcast", roles: roles ?? {}, lensAssign: lensAssign ?? {} });
     persist(get);
   },
 
-  setVerifyTemplate(t) {
-    set({ verifyTemplate: t });
+  setLens(serviceId, lensId) {
+    set((s) => ({ lensAssign: { ...s.lensAssign, [serviceId]: lensId } }));
+    persist(get);
+  },
+
+  setLensOverride(lensId, template) {
+    set((s) => {
+      const next = { ...s.lensOverrides };
+      if (template.trim()) next[lensId] = template;
+      else delete next[lensId];
+      return { lensOverrides: next };
+    });
+    persist(get);
+  },
+
+  addCustomLens(name, template) {
+    const id = `lens-${crypto.randomUUID().slice(0, 8)}`;
+    const lens: Lens = { id, name: name.trim() || "내 렌즈", icon: "★", description: "사용자 렌즈", template, recommended: [], builtin: false };
+    set((s) => ({ customLenses: [...s.customLenses, lens] }));
+    persist(get);
+    return id;
+  },
+
+  removeCustomLens(lensId) {
+    set((s) => {
+      const overrides = { ...s.lensOverrides };
+      delete overrides[lensId];
+      const lensAssign = Object.fromEntries(Object.entries(s.lensAssign).filter(([, v]) => v !== lensId));
+      return { customLenses: s.customLenses.filter((l) => l.id !== lensId), lensOverrides: overrides, lensAssign };
+    });
     persist(get);
   },
 

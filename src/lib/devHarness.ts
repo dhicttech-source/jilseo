@@ -4,13 +4,15 @@
  * import.meta.env.DEV 에서만 시작되므로 dmg(프로덕션)에는 동작하지 않는다.
  *
  * dev_commands.json: { "id": "c1", "type": "broadcast", "text": "..." }
- * types: status | broadcast | pipeline | set_mode | set_role | diagnose | memo | apply_stage | set_columns | maximize
- *        | select_in_panel | eval | attach | add_web_slot | remove_web_slot
+ * types: status | broadcast | pipeline | last_pipeline | set_mode | set_role | set_lens | judge | diagnose | memo | apply_stage | set_columns
+ *        | maximize | select_in_panel | eval | attach | add_web_slot | remove_web_slot
  */
 import { readStore, writeStore } from "./store";
 import { runBroadcastAndWaitSent } from "./broadcast";
 import { runPipeline } from "./pipeline";
 import { resolvePipelineRoles, type PanelRole, type SendMode } from "./roles";
+import type { Judged } from "./lenses";
+import { usePipelineResult } from "../store/pipelineResult";
 import { saveNoteFor } from "./notes";
 import { evalInPanel } from "./panels";
 import { runDiagnostics } from "./diagnostics";
@@ -45,6 +47,7 @@ async function execute(cmd: Command): Promise<unknown> {
         queued: useCloud.getState().queued,
         mode: stage.mode,
         roles: stage.roles,
+        lensAssign: stage.lensAssign,
       };
     case "broadcast": {
       const o = await runBroadcastAndWaitSent(String(cmd.text));
@@ -56,7 +59,24 @@ async function execute(cmd: Command): Promise<unknown> {
     case "pipeline": {
       const steps: string[] = [];
       const r = await runPipeline(String(cmd.text), (step, detail) => steps.push(`${step}: ${detail}`));
-      return { ...r, steps };
+      usePipelineResult.getState().set(r);
+      return {
+        ...r,
+        steps,
+        verifiers: r.verifiers.map((v) => ({ ...v, lens: v.lens.id, text: v.text.slice(0, 400) })),
+      };
+    }
+    case "last_pipeline": {
+      const r = usePipelineResult.getState().result;
+      return r ? { ...r, verifiers: r.verifiers.map((v) => ({ ...v, lens: v.lens.id, text: v.text.slice(0, 400) })) } : null;
+    }
+    case "set_lens":
+      stage.setLens(String(cmd.serviceId), String(cmd.lensId));
+      return { lensAssign: useStage.getState().lensAssign };
+    case "judge": {
+      const res = await usePipelineResult.getState().judge(String(cmd.serviceId), cmd.judged as Judged);
+      const r = usePipelineResult.getState().result;
+      return { result: res, rowId: r?.rowId, judged: r?.verifiers.map((v) => [v.serviceId, v.verdict.judged]) };
     }
     case "set_mode":
       stage.setMode(cmd.mode as SendMode);
@@ -105,15 +125,19 @@ async function execute(cmd: Command): Promise<unknown> {
   }
 }
 
+/** 긴 명령(pipeline·broadcast)이 도는 동안에도 실행해도 되는 읽기 전용 명령 */
+const CONCURRENT_TYPES = new Set(["status", "eval", "last_pipeline"]);
+
 async function tick() {
-  if (running) return;
   const cmd = await readStore<Command>("dev_commands").catch(() => null);
   if (!cmd || !cmd.id || cmd.id === lastId) return;
+  if (running && !CONCURRENT_TYPES.has(cmd.type)) return;
   if (cmd.at && Date.now() - cmd.at > MAX_COMMAND_AGE_MS) {
     lastId = cmd.id; // 오래된 명령은 소비만 하고 실행하지 않는다
     return;
   }
-  running = true;
+  const concurrent = CONCURRENT_TYPES.has(cmd.type);
+  if (!concurrent) running = true;
   lastId = cmd.id;
   const started = Date.now();
   let result: unknown;
@@ -125,7 +149,7 @@ async function tick() {
     result = { error: e instanceof Error ? e.message : String(e) };
   }
   await writeStore("dev_results", { id: cmd.id, type: cmd.type, ok, result, started, finished: Date.now() }).catch(() => {});
-  running = false;
+  if (!concurrent) running = false;
 }
 
 declare global {
