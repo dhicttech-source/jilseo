@@ -124,11 +124,17 @@ export const clearInputJs = (inputSel: string) => `(() => {
  */
 const LAST_RESPONSE_EL = `(() => {
     let el = null;
-    for (let i = els.length - 1; i >= 0; i--) { if ((els[i].innerText || '').trim()) { el = els[i]; break; } }
+    for (let i = els.length - 1; i >= 0; i--) { if ((els[i].textContent || '').trim()) { el = els[i]; break; } }
     if (!el) el = els[els.length - 1] || null;
     while (el && el.parentElement) { const up = el.parentElement.closest(sel); if (!up) break; el = up; }
     return el;
   })()`;
+
+/**
+ * 요소의 본문 텍스트. innerText가 비면 textContent — Gemini의 message-content는 자식이 다른 곳에 투영(content projection)되어
+ * innerText가 ''이고 크기도 0이지만 textContent에는 전체 응답이 있다.
+ */
+const TEXT_OF = (v: string) => `(((${v}).innerText || '').trim() ? (${v}).innerText : ((${v}).textContent || ''))`;
 
 /**
  * 마지막 응답 컨테이너의 텍스트. generatingSel이 주어지면 "생성 중" 표시(중지 버튼·스트리밍 속성)가 보이는지도 함께 돌려준다.
@@ -138,7 +144,7 @@ export const readResponseJs = (responseSel: string, generatingSel?: string) => `
   const sel = ${JSON.stringify(responseSel)};
   const els = document.querySelectorAll(sel);
   const last = ${LAST_RESPONSE_EL};
-  const text = last ? (last.innerText || '') : '';
+  const text = last ? ${TEXT_OF("last")} : '';
   const g = ${generatingSel ? `document.querySelector(${JSON.stringify(generatingSel)})` : "null"};
   const generating = !!g && (g.offsetWidth > 0 || g.offsetHeight > 0 || g.tagName === 'DIV');
   return JSON.stringify({ count: els.length, length: text.length, text: text.slice(0, 20000), generating });

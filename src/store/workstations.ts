@@ -1,6 +1,7 @@
 import { create } from "zustand";
 import { readStore, writeStore } from "../lib/store";
 import { navigatePanel, panelUrl } from "../lib/panels";
+import type { Depth } from "../lib/presets";
 import type { RoleMap, SendMode } from "../lib/roles";
 import { useStage } from "./stage";
 
@@ -19,6 +20,8 @@ export interface Workstation {
   roles?: RoleMap;
   /** 검증 패널 → 렌즈 id */
   lensAssign?: Record<string, string>;
+  depth?: Depth;
+  presetId?: string | null;
   createdAt: number;
   updatedAt: number;
 }
@@ -49,7 +52,7 @@ export const useWorkstations = create<WorkstationsState>((set, get) => ({
 
   /** 현재 스테이지 구성 + 각 패널의 대화 URL을 캡처 */
   async saveCurrent(name, id) {
-    const { stage, columns, mode, roles, lensAssign } = useStage.getState();
+    const { stage, columns, mode, roles, lensAssign, depth, presetId } = useStage.getState();
     const panels: WorkstationPanel[] = await Promise.all(
       stage.map(async (serviceId) => ({
         serviceId,
@@ -66,6 +69,8 @@ export const useWorkstations = create<WorkstationsState>((set, get) => ({
       mode,
       roles,
       lensAssign,
+      depth,
+      presetId,
       createdAt: existing?.createdAt ?? now,
       updatedAt: now,
     };
@@ -92,7 +97,7 @@ export const useWorkstations = create<WorkstationsState>((set, get) => ({
       ws.panels.map((p) => p.serviceId),
       ws.columns,
     );
-    stageStore.restorePipeline(ws.mode, ws.roles, ws.lensAssign);
+    stageStore.restorePipeline(ws.mode, ws.roles, ws.lensAssign, ws.depth, ws.presetId);
   },
 
   async remove(id) {

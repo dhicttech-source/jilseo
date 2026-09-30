@@ -173,9 +173,10 @@ export function resolveLens(id: string | undefined, overrides: Record<string, st
   return override?.trim() ? { ...base, template: override } : base;
 }
 
-/** 렌즈 템플릿 + 판정 블록(없으면 추가) → 검증 프롬프트 */
-export function buildLensPrompt(lens: Lens, question: string, answer: string): string {
-  const tpl = lens.template.includes(VERDICT_MARK) ? lens.template : `${lens.template}\n\n${VERDICT_BLOCK}`;
+/** 렌즈 템플릿 + (깊이별 길이 지시) + 판정 블록(없으면 추가) → 검증 프롬프트 */
+export function buildLensPrompt(lens: Lens, question: string, answer: string, lengthHint = ""): string {
+  const body = lengthHint.trim() ? `${lens.template}\n\n${lengthHint.trim()}` : lens.template;
+  const tpl = body.includes(VERDICT_MARK) ? body : `${body}\n\n${VERDICT_BLOCK}`;
   return buildVerifyPrompt(tpl, question, answer);
 }
 

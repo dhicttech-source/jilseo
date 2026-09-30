@@ -5,6 +5,7 @@ import { measureViewportInset } from "../lib/panels";
 import { assignRole, type PanelRole, type RoleMap, type SendMode } from "../lib/roles";
 import { DEFAULT_VERIFY_TEMPLATE } from "../lib/verifyPrompt";
 import { COMPOSITE_LENS_ID, type Lens } from "../lib/lenses";
+import { applyPreset, findPreset, type Depth } from "../lib/presets";
 
 export type PanelPhase =
   | "creating"
@@ -60,6 +61,10 @@ interface Settings {
   lensOverrides?: Record<string, string>;
   /** 사용자 정의 렌즈 */
   customLenses?: Lens[];
+  /** 검토 깊이 (빠름/표준/심층) */
+  depth?: Depth;
+  /** 마지막으로 적용한 프리셋 id (표시용) */
+  presetId?: string | null;
 }
 
 export const UI_SCALES = [1, 1.15, 1.3, 1.5] as const;
@@ -133,12 +138,17 @@ interface StageState {
   lensAssign: Record<string, string>;
   lensOverrides: Record<string, string>;
   customLenses: Lens[];
+  depth: Depth;
+  presetId: string | null;
 
   init(): Promise<void>;
+  setDepth(depth: Depth): void;
+  /** 프리셋 적용: 역할·렌즈 배정과 기본 깊이를 바꾼다. 반환: 배정 결과(표시용). 모르는 id면 null */
+  applyPresetToStage(presetId: string): ReturnType<typeof applyPreset> | null;
   setMode(mode: SendMode): void;
   setRole(id: string, role: PanelRole): void;
   /** 워크스테이션 복원용: 모드·역할·렌즈 배정을 한 번에 교체 */
-  restorePipeline(mode: SendMode | undefined, roles: RoleMap | undefined, lensAssign?: Record<string, string>): void;
+  restorePipeline(mode: SendMode | undefined, roles: RoleMap | undefined, lensAssign?: Record<string, string>, depth?: Depth, presetId?: string | null): void;
   setLens(serviceId: string, lensId: string): void;
   /** 템플릿 덮어쓰기. 빈 문자열이면 덮어쓰기 제거(기본 복원) */
   setLensOverride(lensId: string, template: string): void;
@@ -165,7 +175,7 @@ function persist(get: () => StageState) {
   saveTimer = setTimeout(() => {
     const {
       stage, columns, maximized, supabase, device, onboarded, webSlots, newChatAfterFile, uiScale, mode, roles,
-      lensAssign, lensOverrides, customLenses,
+      lensAssign, lensOverrides, customLenses, depth, presetId,
     } = get();
     const settings: Settings = {
       version: 1,
@@ -183,6 +193,8 @@ function persist(get: () => StageState) {
       lensAssign,
       lensOverrides,
       customLenses,
+      depth,
+      presetId,
     };
     invoke("write_settings", { settings }).catch(() => {});
   }, 200);
@@ -210,6 +222,8 @@ export const useStage = create<StageState>((set, get) => ({
   lensAssign: {},
   lensOverrides: {},
   customLenses: [],
+  depth: "standard",
+  presetId: null,
 
   async init() {
     const [svcRes, settings, dir, inset] = await Promise.all([
@@ -246,6 +260,8 @@ export const useStage = create<StageState>((set, get) => ({
       lensAssign: settings?.lensAssign ?? {},
       lensOverrides: migrateVerifyTemplate(settings?.lensOverrides ?? {}, settings?.verifyTemplate),
       customLenses: settings?.customLenses ?? [],
+      depth: settings?.depth ?? "standard",
+      presetId: settings?.presetId ?? null,
     });
     applyUiScale(settings?.uiScale ?? DEFAULT_UI_SCALE);
   },
@@ -261,9 +277,26 @@ export const useStage = create<StageState>((set, get) => ({
     persist(get);
   },
 
-  restorePipeline(mode, roles, lensAssign) {
-    set({ mode: mode ?? "broadcast", roles: roles ?? {}, lensAssign: lensAssign ?? {} });
+  restorePipeline(mode, roles, lensAssign, depth, presetId) {
+    set({ mode: mode ?? "broadcast", roles: roles ?? {}, lensAssign: lensAssign ?? {}, depth: depth ?? "standard", presetId: presetId ?? null });
     persist(get);
+  },
+
+  setDepth(depth) {
+    set({ depth });
+    persist(get);
+  },
+
+  applyPresetToStage(presetId) {
+    const preset = findPreset(presetId);
+    if (!preset) return null;
+    const { stage, services, roles } = get();
+    const currentGen = Object.entries(roles).find(([, r]) => r === "generate")?.[0] ?? null;
+    const app = applyPreset(preset, stage, services, currentGen);
+    // 렌즈 배정은 프리셋이 정한 패널만 바꾸고 나머지는 유지 (제외된 패널의 렌즈는 다음에 다시 검증으로 올릴 때 쓰인다)
+    set((s) => ({ roles: app.roles, lensAssign: { ...s.lensAssign, ...app.lensAssign }, depth: preset.defaultDepth, presetId: preset.id }));
+    persist(get);
+    return app;
   },
 
   setLens(serviceId, lensId) {

@@ -5,6 +5,8 @@
       scripts/harness.py '{"type":"broadcast","text":"질서 자동 테스트 1","wait":true}' 240
       scripts/harness.py '{"type":"set_role","serviceId":"claude","role":"generate"}'
       scripts/harness.py '{"type":"set_lens","serviceId":"perplexity","lensId":"fact"}'
+      scripts/harness.py '{"type":"apply_preset","presetId":"report"}'   # report|idea|code|quick|opinion
+      scripts/harness.py '{"type":"set_depth","depth":"standard"}'       # quick|standard|deep
       scripts/harness.py '{"type":"pipeline","text":"질서 파이프라인 테스트 1"}' 480
       scripts/harness.py '{"type":"judge","serviceId":"claude","judged":"right"}'
 """

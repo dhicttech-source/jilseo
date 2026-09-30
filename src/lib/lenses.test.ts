@@ -112,3 +112,16 @@ describe("parseVerdict", () => {
     expect(parseVerdict("", "fact").parsed).toBe(false);
   });
 });
+
+describe("buildLensPrompt 길이 지시", () => {
+  it("길이 지시는 본문 뒤, 판정 블록 앞에 들어간다", () => {
+    const lens = resolveLens("risk", {}, []);
+    const out = buildLensPrompt(lens, "q", "a", "5줄 이내");
+    expect(out.indexOf("5줄 이내")).toBeGreaterThan(out.indexOf("a"));
+    expect(out.indexOf("5줄 이내")).toBeLessThan(out.indexOf(VERDICT_MARK));
+  });
+  it("빈 지시는 무시", () => {
+    const lens = resolveLens("risk", {}, []);
+    expect(buildLensPrompt(lens, "q", "a", "  ")).toBe(buildLensPrompt(lens, "q", "a"));
+  });
+});

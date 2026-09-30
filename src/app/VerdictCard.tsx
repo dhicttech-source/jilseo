@@ -1,4 +1,5 @@
 import { GRADE_LABEL, type Grade, type Judged } from "../lib/lenses";
+import { depthOf, findPreset, sortByLensOrder } from "../lib/presets";
 import { usePipelineResult } from "../store/pipelineResult";
 import { useStage } from "../store/stage";
 
@@ -24,8 +25,13 @@ export function VerdictCard() {
   const judge = usePipelineResult((s) => s.judge);
   const close = usePipelineResult((s) => s.set);
   const services = useStage((s) => s.services);
+  const setMaximized = useStage((s) => s.setMaximized);
+  const maximized = useStage((s) => s.maximized);
   if (!result) return null;
   const name = (id: string) => services.find((x) => x.id === id)?.name ?? id;
+  // 표시 순서: 긍정 → 사실 → 추론 → 부정 → 개선 (설계 §4). 패널 자체는 옮기지 않는다
+  const ordered = sortByLensOrder(result.verifiers, (v) => v.lens.id);
+  const preset = findPreset(result.presetId ?? undefined);
 
   return (
     <div className="flex shrink-0 flex-col gap-2 border-t border-white/10 bg-white/[0.03] px-3 py-2 text-sm">
@@ -34,13 +40,22 @@ export function VerdictCard() {
         <span>
           {name(result.generator)} 생성 → 검증 {result.verifiersSent}/{result.verifiersTotal} · {Math.round(result.ms / 1000)}s
           {result.saved !== "skipped" && ` · 기록 ${result.saved === "saved" ? "저장" : "큐"}`}
+          {` · ${preset ? preset.name + " · " : ""}${depthOf(result.depth).label}`}
+          {result.skipped.length > 0 && ` · 생략 ${result.skipped.map(name).join(", ")}`}
         </span>
-        <button onClick={() => close(null)} className="ml-auto rounded px-2 py-0.5 text-white/50 hover:bg-white/10 hover:text-white/90" title="닫기">
+        <button
+          onClick={() => setMaximized(maximized === result.generator ? null : result.generator)}
+          className="ml-auto rounded px-2 py-0.5 text-white/60 hover:bg-white/10 hover:text-white/90"
+          title="판정을 먼저 읽고 나서 생성 답변 원문을 크게 봅니다"
+        >
+          {maximized === result.generator ? "원문 닫기" : "생성 원문 크게 보기"}
+        </button>
+        <button onClick={() => close(null)} className="rounded px-2 py-0.5 text-white/50 hover:bg-white/10 hover:text-white/90" title="닫기">
           ✕
         </button>
       </div>
-      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(1, result.verifiers.length)}, minmax(0, 1fr))` }}>
-        {result.verifiers.map((v) => (
+      <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(1, ordered.length)}, minmax(0, 1fr))` }}>
+        {ordered.map((v) => (
           <div key={v.serviceId} className="flex min-w-0 flex-col gap-1 rounded-lg border border-white/10 p-2">
             <div className="flex items-center gap-2">
               <span className="font-medium text-white/85">{name(v.serviceId)}</span>

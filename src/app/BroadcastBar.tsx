@@ -2,6 +2,7 @@ import { useRef, useState } from "react";
 import { isBroadcastTarget } from "../adapters";
 import { runBroadcast } from "../lib/broadcast";
 import { lensFor, runPipeline } from "../lib/pipeline";
+import { BUILTIN_PRESETS, DEPTHS } from "../lib/presets";
 import { resolvePipelineRoles } from "../lib/roles";
 import { MAX_ATTACHMENT_BYTES, useAttachment } from "../store/attachment";
 import { useDraft } from "../store/draft";
@@ -37,8 +38,24 @@ export function BroadcastBar() {
   const setMode = useStage((s) => s.setMode);
   const roles = useStage((s) => s.roles);
   const lensAssign = useStage((s) => s.lensAssign);
+  const depth = useStage((s) => s.depth);
+  const setDepth = useStage((s) => s.setDepth);
+  const presetId = useStage((s) => s.presetId);
+  const applyPresetToStage = useStage((s) => s.applyPresetToStage);
   const setResult = usePipelineResult((s) => s.set);
   const pipeline = mode === "pipeline";
+
+  const applyPreset = (id: string) => {
+    if (!id) return;
+    const app = applyPresetToStage(id);
+    if (!app) return;
+    const name = (sid: string) => services.find((x) => x.id === sid)?.name ?? sid;
+    const parts = app.assigned.map((sid) => `${name(sid)}(${lensFor(sid).name})`);
+    setSummary(
+      `프리셋 적용: ${app.generator ? name(app.generator) : "?"} 생성 → ${parts.join(" · ") || "검증 없음"}` +
+        (app.leftover.length ? ` · 제외 ${app.leftover.map(name).join(", ")}` : ""),
+    );
+  };
   const resolved = resolvePipelineRoles(stage, roles, services);
   void lensAssign; // 렌즈 배정이 바뀌면 placeholder를 다시 그린다
 
@@ -62,7 +79,7 @@ export function BroadcastBar() {
     try {
       const r = await runPipeline(body, (_step, detail) => setSummary(detail));
       setResult(r); // 요약 카드(VerdictCard)가 판정과 채택 버튼을 보여 준다
-      setSummary(`검증 ${r.verifiersSent}/${r.verifiersTotal} · ${Math.round(r.ms / 1000)}s`);
+      setSummary(`검증 ${r.verifiersSent}/${r.verifiersTotal} · ${Math.round(r.ms / 1000)}s` + (r.skipped.length ? ` · 깊이 상한으로 ${r.skipped.length}개 생략` : ""));
     } catch (e) {
       setSummary(`파이프라인 실패: ${e instanceof Error ? e.message : String(e)}`);
       setText(body); // 실패하면 입력을 되돌려 다시 시도할 수 있게
@@ -121,6 +138,36 @@ export function BroadcastBar() {
       >
         {pipeline ? "생성→검증" : "동시"}
       </button>
+      {pipeline && (
+        <div className="flex h-12 shrink-0 flex-col justify-center gap-1">
+          <select
+            value={presetId ?? ""}
+            onChange={(e) => applyPreset(e.target.value)}
+            disabled={busy}
+            title="검토 프리셋: 역할·렌즈를 한 번에 배정합니다 (생성 패널은 유지)"
+            className="h-5 max-w-40 rounded border border-white/15 bg-white/5 px-1 text-xs text-white/80 outline-none"
+          >
+            <option value="" className="bg-[#1a1d24]">프리셋…</option>
+            {BUILTIN_PRESETS.map((p) => (
+              <option key={p.id} value={p.id} className="bg-[#1a1d24]" title={p.description}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <span className="flex gap-0.5" title="깊이: 검증 패널 수와 판정 길이 (빠름 1개·5줄 / 표준 3개·15줄 / 심층 전부)">
+            {DEPTHS.map((d) => (
+              <button
+                key={d.id}
+                onClick={() => setDepth(d.id)}
+                disabled={busy}
+                className={"rounded px-1.5 text-xs " + (depth === d.id ? "bg-white/20 text-white/90" : "text-white/40 hover:bg-white/10")}
+              >
+                {d.label}
+              </button>
+            ))}
+          </span>
+        </div>
+      )}
       <button
         onClick={toggleLibrary}
         title="프롬프트 라이브러리"

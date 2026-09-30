@@ -1,6 +1,7 @@
 import { ServiceAdapter, type Attachment } from "../adapters";
 import { moveToNewChatAfterFile, sendAndCollect } from "./broadcast";
 import { buildLensPrompt, parseVerdict, resolveLens, VERDICTS_KEY, type Lens, type Verdict } from "./lenses";
+import { depthOf, findPreset, limitByDepth, type Depth } from "./presets";
 import { resolvePipelineRoles } from "./roles";
 import { saveRow } from "./supabase";
 import { verifyKey } from "./verifyPrompt";
@@ -31,6 +32,10 @@ export interface PipelineResult {
   saved: "saved" | "queued" | "skipped";
   ms: number;
   at: number;
+  depth: Depth;
+  presetId: string | null;
+  /** 깊이 상한으로 이번 실행에서 빠진 검증 패널 id */
+  skipped: string[];
 }
 
 /** 검증 패널의 렌즈 (미배정은 종합) */
@@ -65,10 +70,15 @@ export async function runPipeline(
 ): Promise<PipelineResult> {
   const body = text.trim();
   if (!body) throw new Error("보낼 내용이 없습니다");
-  const { stage, roles, services, device } = useStage.getState();
+  const { stage, roles, services, device, depth, presetId } = useStage.getState();
   const resolved = resolvePipelineRoles(stage, roles, services);
   if (resolved.error || !resolved.generator) throw new Error(resolved.error ?? "생성 패널이 없습니다");
   const gen = resolved.generator;
+  // 깊이 상한: 프리셋 슬롯 순서(렌즈 배정 순)를 우선해 앞에서 자른다
+  const preferred = presetId ? verifierOrderForPreset(presetId, resolved.verifiers.map((v) => v.id)) : [];
+  const verifierDefs = limitByDepth(resolved.verifiers, depth, (v) => v.id, preferred);
+  const skipped = resolved.verifiers.filter((v) => !verifierDefs.includes(v)).map((v) => v.id);
+  const lengthHint = depthOf(depth).lengthHint;
   const t0 = performance.now();
   if (attachment) useAttachment.getState().set(null); // 첨부는 생성 단계 1회만
 
@@ -78,19 +88,19 @@ export async function runPipeline(
   const answer = first.responses[gen.id] ?? "";
   if (!answer.trim()) throw new Error(`${gen.name} 응답을 받지 못했습니다`);
 
-  const lenses = new Map(resolved.verifiers.map((v) => [v.id, lensFor(v.id)] as const));
-  onProgress("verify", `${resolved.verifiers.map((v) => `${v.name}(${lenses.get(v.id)!.name})`).join("·")} 검증 중`);
+  const lenses = new Map(verifierDefs.map((v) => [v.id, lensFor(v.id)] as const));
+  onProgress("verify", `${verifierDefs.map((v) => `${v.name}(${lenses.get(v.id)!.name})`).join("·")} 검증 중`);
   // 렌즈가 패널마다 다르므로 텍스트별로 묶어 전송한다 (같은 렌즈는 한 번에)
   const groups = new Map<string, ServiceAdapter[]>();
-  for (const v of resolved.verifiers) {
-    const prompt = buildLensPrompt(lenses.get(v.id)!, body, answer);
+  for (const v of verifierDefs) {
+    const prompt = buildLensPrompt(lenses.get(v.id)!, body, answer, lengthHint);
     groups.set(prompt, [...(groups.get(prompt) ?? []), new ServiceAdapter(v)]);
   }
   const seconds = await Promise.all([...groups].map(([prompt, adapters]) => sendAndCollect(prompt, adapters, null)));
   const sent = Object.assign({}, ...seconds.map((s) => s.sent)) as Record<string, { ok: boolean }>;
   const texts = Object.assign({}, ...seconds.map((s) => s.responses)) as Record<string, string>;
 
-  const verifiers: VerifierResult[] = resolved.verifiers.map((v) => {
+  const verifiers: VerifierResult[] = verifierDefs.map((v) => {
     const lens = lenses.get(v.id)!;
     const ok = !!sent[v.id]?.ok;
     const t = ok ? (texts[v.id] ?? "") : "";
@@ -109,7 +119,7 @@ export async function runPipeline(
   if (attachment) moveToNewChatAfterFile([gen]);
 
   const verifiersSent = verifiers.filter((v) => v.sent).length;
-  onProgress("done", `검증 ${verifiersSent}/${resolved.verifiers.length}`);
+  onProgress("done", `검증 ${verifiersSent}/${verifierDefs.length}`);
   return {
     rowId,
     prompt: body,
@@ -117,9 +127,29 @@ export async function runPipeline(
     answer,
     verifiers,
     verifiersSent,
-    verifiersTotal: resolved.verifiers.length,
+    verifiersTotal: verifierDefs.length,
     saved,
     ms: Math.round(performance.now() - t0),
     at: Date.now(),
+    depth,
+    presetId,
+    skipped,
   };
+}
+
+/** 프리셋 슬롯 순서대로 검증 패널 id를 정렬한 목록 (깊이 절단의 우선순위) */
+function verifierOrderForPreset(presetId: string, verifierIds: string[]): string[] {
+  const preset = findPreset(presetId);
+  if (!preset) return [];
+  const { lensAssign } = useStage.getState();
+  const used = new Set<string>();
+  const order: string[] = [];
+  for (const slot of preset.slots) {
+    const id = verifierIds.find((v) => !used.has(v) && lensAssign[v] === slot.lens);
+    if (id) {
+      used.add(id);
+      order.push(id);
+    }
+  }
+  return order;
 }

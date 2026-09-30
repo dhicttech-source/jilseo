@@ -4,7 +4,7 @@
  * import.meta.env.DEV 에서만 시작되므로 dmg(프로덕션)에는 동작하지 않는다.
  *
  * dev_commands.json: { "id": "c1", "type": "broadcast", "text": "..." }
- * types: status | broadcast | pipeline | last_pipeline | set_mode | set_role | set_lens | judge | diagnose | memo | apply_stage | set_columns
+ * types: status | broadcast | pipeline | last_pipeline | set_mode | set_role | set_lens | apply_preset | set_depth | judge | diagnose | memo | apply_stage | set_columns
  *        | maximize | select_in_panel | eval | attach | add_web_slot | remove_web_slot
  */
 import { readStore, writeStore } from "./store";
@@ -12,6 +12,7 @@ import { runBroadcastAndWaitSent } from "./broadcast";
 import { runPipeline } from "./pipeline";
 import { resolvePipelineRoles, type PanelRole, type SendMode } from "./roles";
 import type { Judged } from "./lenses";
+import type { Depth } from "./presets";
 import { usePipelineResult } from "../store/pipelineResult";
 import { probeRecords } from "./devProbe";
 import { saveNoteFor } from "./notes";
@@ -49,6 +50,8 @@ async function execute(cmd: Command): Promise<unknown> {
         mode: stage.mode,
         roles: stage.roles,
         lensAssign: stage.lensAssign,
+        depth: stage.depth,
+        presetId: stage.presetId,
       };
     case "broadcast": {
       const o = await runBroadcastAndWaitSent(String(cmd.text));
@@ -73,6 +76,14 @@ async function execute(cmd: Command): Promise<unknown> {
       const r = usePipelineResult.getState().result;
       return r ? { ...r, verifiers: r.verifiers.map((v) => ({ ...v, lens: v.lens.id, text: v.text.slice(0, 400) })) } : null;
     }
+    case "apply_preset": {
+      const app = stage.applyPresetToStage(String(cmd.presetId));
+      const s = useStage.getState();
+      return app ? { ...app, depth: s.depth, presetId: s.presetId } : { error: "unknown preset" };
+    }
+    case "set_depth":
+      stage.setDepth(cmd.depth as Depth);
+      return { depth: useStage.getState().depth };
     case "set_lens":
       stage.setLens(String(cmd.serviceId), String(cmd.lensId));
       return { lensAssign: useStage.getState().lensAssign };
