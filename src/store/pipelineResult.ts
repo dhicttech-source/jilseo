@@ -45,7 +45,7 @@ export const usePipelineResult = create<PipelineResultState>((set, get) => ({
     if (r.saved === "skipped") return "skipped";
     const cloud = useCloud.getState();
     const res = await updateOrQueue(cloud.config(), "comparisons", r.rowId, {
-      responses: buildResponsesRow(r.generator, r.answer, verifiers, r.revised),
+      responses: buildResponsesRow(r.generator, r.answer, verifiers, r.revised, { presetId: r.presetId, depth: r.depth }),
     });
     void cloud.flush();
     return res;

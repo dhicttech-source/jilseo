@@ -2,13 +2,18 @@ import { useRef, useState } from "react";
 import { isBroadcastTarget } from "../adapters";
 import { runBroadcast } from "../lib/broadcast";
 import { lensFor, runPipeline } from "../lib/pipeline";
-import { BUILTIN_PRESETS, DEPTHS } from "../lib/presets";
+import { BUILTIN_PRESETS, DEPTHS, findPreset } from "../lib/presets";
+import { BUILTIN_LENSES } from "../lib/lenses";
+import { recommend } from "../lib/scorecard";
 import { resolvePipelineRoles } from "../lib/roles";
 import { MAX_ATTACHMENT_BYTES, useAttachment } from "../store/attachment";
 import { useDraft } from "../store/draft";
 import { useLibrary } from "../store/library";
 import { usePipelineResult } from "../store/pipelineResult";
+import { useScorecard } from "../store/scorecard";
 import { useStage } from "../store/stage";
+
+const lensLabel = (id: string) => BUILTIN_LENSES.find((l) => l.id === id)?.name ?? id;
 
 export function BroadcastBar() {
   const text = useDraft((s) => s.text);
@@ -42,8 +47,29 @@ export function BroadcastBar() {
   const setDepth = useStage((s) => s.setDepth);
   const presetId = useStage((s) => s.presetId);
   const applyPresetToStage = useStage((s) => s.applyPresetToStage);
+  const setRole = useStage((s) => s.setRole);
+  const setLens = useStage((s) => s.setLens);
+  const card = useScorecard((s) => s.card);
   const setResult = usePipelineResult((s) => s.set);
   const pipeline = mode === "pipeline";
+  const resolved = resolvePipelineRoles(stage, roles, services);
+  void lensAssign; // 렌즈 배정이 바뀌면 placeholder를 다시 그린다
+
+  // 성적표 기반 배정 제안: 현재 프리셋의 슬롯마다 채택 3건 이상 중 최고 정확도 모델. 제안일 뿐 클릭해야 반영
+  const preset = findPreset(presetId ?? undefined);
+  const suggestions =
+    pipeline && card && preset
+      ? recommend(card, preset, stage.filter((id) => id !== resolved.generator?.id && services.some((s) => s.id === id && isBroadcastTarget(s))))
+      : [];
+  const actionable = suggestions.filter((r) => r.model && (resolved.verifiers.find((v) => v.id === r.model) ? lensAssign[r.model] !== r.lens : true));
+  const applySuggestions = () => {
+    for (const r of actionable) {
+      if (!r.model) continue;
+      setRole(r.model, "verify");
+      setLens(r.model, r.lens);
+    }
+    setSummary(`추천 반영: ${actionable.map((r) => `${services.find((x) => x.id === r.model)?.name ?? r.model}(${lensFor(r.model!).name})`).join(" · ")}`);
+  };
 
   const applyPreset = (id: string) => {
     if (!id) return;
@@ -56,8 +82,6 @@ export function BroadcastBar() {
         (app.leftover.length ? ` · 제외 ${app.leftover.map(name).join(", ")}` : ""),
     );
   };
-  const resolved = resolvePipelineRoles(stage, roles, services);
-  void lensAssign; // 렌즈 배정이 바뀌면 placeholder를 다시 그린다
 
   const targets = stage
     .map((id) => services.find((s) => s.id === id))
@@ -198,6 +222,18 @@ export function BroadcastBar() {
             📎 {attachment.name} · {(attachment.size / 1024).toFixed(0)}KB
             <button onClick={() => setAttachment(null)} className="ml-1 text-sky-200/60 hover:text-white">✕</button>
           </span>
+        )}
+        {actionable.length > 0 && (
+          <button
+            onClick={applySuggestions}
+            disabled={busy}
+            className="rounded border border-sky-400/40 px-2 py-0.5 text-xs text-sky-200 hover:bg-sky-400/15 disabled:opacity-40"
+            title={suggestions
+              .map((r) => `${lensLabel(r.lens)}: ${r.model ? `${services.find((x) => x.id === r.model)?.name ?? r.model} ${Math.round((r.accuracy ?? 0) * 100)}% (${r.judged}건)` : "기록 부족"}`)
+              .join("\n")}
+          >
+            성적표 추천 반영: {actionable.map((r) => `${services.find((x) => x.id === r.model)?.name ?? r.model}→${lensLabel(r.lens)}`).join(" · ")}
+          </button>
         )}
         {summary && <span className="text-xs text-white/50">{summary}</span>}
         <button

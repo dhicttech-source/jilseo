@@ -4,7 +4,7 @@
  * import.meta.env.DEV 에서만 시작되므로 dmg(프로덕션)에는 동작하지 않는다.
  *
  * dev_commands.json: { "id": "c1", "type": "broadcast", "text": "..." }
- * types: status | broadcast | pipeline | last_pipeline | revise | set_mode | set_role | set_lens | apply_preset | set_depth | judge | diagnose | memo | apply_stage | set_columns
+ * types: status | broadcast | pipeline | last_pipeline | revise | scorecard | ui_eval | set_mode | set_role | set_lens | apply_preset | set_depth | judge | diagnose | memo | apply_stage | set_columns
  *        | maximize | select_in_panel | eval | attach | add_web_slot | remove_web_slot
  */
 import { readStore, writeStore } from "./store";
@@ -15,6 +15,9 @@ import type { Judged } from "./lenses";
 import type { Depth } from "./presets";
 import { usePipelineResult } from "../store/pipelineResult";
 import { probeRecords } from "./devProbe";
+import { useScorecard } from "../store/scorecard";
+import { findPreset } from "./presets";
+import { recommend } from "./scorecard";
 import { saveNoteFor } from "./notes";
 import { evalInPanel } from "./panels";
 import { runDiagnostics } from "./diagnostics";
@@ -72,6 +75,16 @@ async function execute(cmd: Command): Promise<unknown> {
         verifiers: r.verifiers.map((v) => ({ ...v, lens: v.lens.id, text: v.text.slice(0, 400) })),
       };
     }
+    case "scorecard": {
+      const card = await useScorecard.getState().load();
+      if (!card) return { error: useScorecard.getState().message };
+      const preset = findPreset(String(cmd.presetId ?? ""));
+      const rec = preset ? recommend(card, preset, stage.stage.filter((id) => stage.roles[id] !== "generate")) : null;
+      return { ...card, recommend: rec };
+    }
+    case "ui_eval":
+      // UI webview 안에서 실행 (화면 전환 등 테스트용). 개발 빌드 전용
+      return new Function(String(cmd.js))();
     case "probes":
       return probeRecords();
     case "last_pipeline": {
@@ -147,7 +160,7 @@ async function execute(cmd: Command): Promise<unknown> {
 }
 
 /** 긴 명령(pipeline·broadcast)이 도는 동안에도 실행해도 되는 읽기 전용 명령 */
-const CONCURRENT_TYPES = new Set(["status", "eval", "last_pipeline", "probes"]);
+const CONCURRENT_TYPES = new Set(["status", "eval", "last_pipeline", "probes", "ui_eval"]);
 
 async function tick() {
   const cmd = await readStore<Command>("dev_commands").catch(() => null);

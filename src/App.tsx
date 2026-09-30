@@ -4,6 +4,7 @@ import { BroadcastBar } from "./app/BroadcastBar";
 import { Dock } from "./app/Dock";
 import { Onboarding } from "./app/Onboarding";
 import { PromptLibrary } from "./app/PromptLibrary";
+import { Scorecard } from "./app/Scorecard";
 import { SettingsView } from "./app/SettingsView";
 import { Stage } from "./app/Stage";
 import { VerdictCard } from "./app/VerdictCard";
@@ -16,7 +17,7 @@ import { useFavorites } from "./store/favorites";
 import { runDiagnostics, summarize } from "./lib/diagnostics";
 import { startDevHarness } from "./lib/devHarness";
 
-type View = "stage" | "settings";
+type View = "stage" | "settings" | "scorecard";
 
 export default function App() {
   const loaded = useStage((s) => s.loaded);
@@ -90,6 +91,13 @@ export default function App() {
           셀렉터 JSON 폴더
         </button>
         <button
+          className={"rounded px-2.5 py-1 hover:bg-white/10 " + (view === "scorecard" ? "bg-white/15 text-white/90" : "text-white/55 hover:text-white/90")}
+          title="렌즈×모델 맞는 지적 비율, 생성 모델 신뢰 비율 (파이프라인 기록 집계)"
+          onClick={() => setView(view === "scorecard" ? "stage" : "scorecard")}
+        >
+          성적표
+        </button>
+        <button
           className={"rounded px-2.5 py-1 hover:bg-white/10 " + (view === "settings" ? "bg-white/15 text-white/90" : "text-white/55 hover:text-white/90")}
           title={`Supabase: ${cloudStatus}${queued ? ` · 대기열 ${queued}` : ""}`}
           onClick={() => setView(view === "settings" ? "stage" : "settings")}
@@ -104,6 +112,8 @@ export default function App() {
         <Onboarding onSettings={() => setView("settings")} />
       ) : view === "settings" ? (
         <SettingsView onClose={() => setView("stage")} />
+      ) : view === "scorecard" ? (
+        <Scorecard onClose={() => setView("stage")} />
       ) : (
         <Stage />
       )}

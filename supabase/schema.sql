@@ -28,7 +28,8 @@ create table if not exists public.comparisons (
   prompt text not null,
   responses jsonb not null,   -- {chatgpt:"...", claude:"...", ...}
                               -- 파이프라인: 생성은 서비스 id, 검증은 "verify:<id>", 수정본은 "revised:<생성 id>",
-                              --             판정 메타는 "_verdicts": {<id>: {lens, grade, counts, headline, judged}}
+                              --             판정 메타는 "_verdicts": {<id>: {lens, grade, counts, headline, judged}},
+                              --             실행 메타는 "_meta": {presetId, depth, generator, verifiers[], revised}
   device text,                -- "mac_studio" | "macbook"
   created_at timestamptz default now()
 );

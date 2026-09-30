@@ -4,6 +4,7 @@ import { buildLensPrompt, parseVerdict, resolveLens, VERDICTS_KEY, type Lens, ty
 import { depthOf, findPreset, limitByDepth, type Depth } from "./presets";
 import { DEFAULT_REVISE_TEMPLATE, REVISE_TEMPLATE_KEY, buildRevisePrompt, revisedKey } from "./revise";
 import { resolvePipelineRoles } from "./roles";
+import { PIPELINE_META_KEY, type PipelineMeta } from "./scorecard";
 import { saveRow, updateOrQueue } from "./supabase";
 import { verifyKey } from "./verifyPrompt";
 import { useAttachment } from "../store/attachment";
@@ -48,10 +49,26 @@ export function lensFor(serviceId: string): Lens {
   return resolveLens(lensAssign[serviceId], lensOverrides, customLenses);
 }
 
-/** 비교 기록 responses jsonb 조립: 생성은 id, 검증은 verify:id, 수정본은 revised:id, 판정 메타는 _verdicts */
-export function buildResponsesRow(generatorId: string, answer: string, verifiers: VerifierResult[], revised?: string) {
+/** 비교 기록 responses jsonb 조립: 생성은 id, 검증은 verify:id, 수정본은 revised:id, 판정 메타는 _verdicts, 실행 메타는 _meta */
+export function buildResponsesRow(
+  generatorId: string,
+  answer: string,
+  verifiers: VerifierResult[],
+  revised?: string,
+  meta?: { presetId: string | null; depth: Depth },
+) {
   const responses: Record<string, unknown> = { [generatorId]: answer };
   if (revised?.trim()) responses[revisedKey(generatorId)] = revised;
+  if (meta) {
+    const m: PipelineMeta = {
+      presetId: meta.presetId,
+      depth: meta.depth,
+      generator: generatorId,
+      verifiers: verifiers.filter((v) => v.sent).map((v) => ({ id: v.serviceId, lens: v.lens.id })),
+      revised: !!revised?.trim(),
+    };
+    responses[PIPELINE_META_KEY] = m;
+  }
   const verdicts: Record<string, Verdict> = {};
   for (const v of verifiers) {
     if (!v.sent) continue;
@@ -117,7 +134,7 @@ export async function runPipeline(
   const saved = await saveRow(cloud.config(), cloud.user, "comparisons", {
     id: rowId,
     prompt: body,
-    responses: buildResponsesRow(gen.id, answer, verifiers),
+    responses: buildResponsesRow(gen.id, answer, verifiers, undefined, { presetId, depth }),
     device,
   });
   void cloud.flush();
@@ -174,7 +191,7 @@ export async function runRevise(result: PipelineResult, onProgress: (step: Pipel
   if (result.saved !== "skipped") {
     const cloud = useCloud.getState();
     await updateOrQueue(cloud.config(), "comparisons", result.rowId, {
-      responses: buildResponsesRow(result.generator, result.answer, result.verifiers, revised),
+      responses: buildResponsesRow(result.generator, result.answer, result.verifiers, revised, { presetId: result.presetId, depth: result.depth }),
     });
     void cloud.flush();
   }
