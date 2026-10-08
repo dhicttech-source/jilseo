@@ -118,6 +118,8 @@ Tauri 2는 Windows에서 WebView2(Chromium)로 동작하며 프론트·어댑터
 
 ## 4. 제약 재확인
 
+> **2026-10-08 변경(사용자 결정)**: 별도 Supabase Free 프로젝트 `jilseo` 대신 사용자의 기존(유료) Supabase 프로젝트에 `jilseo_` 접두어 테이블로 함께 둔다. 계정 하나로 관리하기 위해서이며, Free 일시정지 방지용 keepalive(launchd)는 제거했다. RLS는 그대로 본인 행만.
+
 - API 호출 금지. DOM 주입만.
 - 자동 반복 전송 없음. 전송 간 300ms 랜덤 지터.
 - 쿠키·로그인 정보는 앱이 만지지 않음(WKWebsiteDataStore에 위임).

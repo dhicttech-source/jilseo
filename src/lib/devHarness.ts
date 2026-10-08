@@ -16,6 +16,7 @@ import type { Depth } from "./presets";
 import { usePipelineResult } from "../store/pipelineResult";
 import { probeRecords } from "./devProbe";
 import { useScorecard } from "../store/scorecard";
+import { getClient, tableName } from "./supabase";
 import { findPreset } from "./presets";
 import { recommend } from "./scorecard";
 import { saveNoteFor } from "./notes";
@@ -85,6 +86,23 @@ async function execute(cmd: Command): Promise<unknown> {
     case "ui_eval":
       // UI webview 안에서 실행 (화면 전환 등 테스트용). 개발 빌드 전용
       return new Function(String(cmd.js))();
+    case "recent_rows": {
+      // 두 기기 동기화 확인용: 최근 기록의 기기·시각만 (본문 제외)
+      const c = getClient(useCloud.getState().config());
+      if (!c) return { error: "no supabase client" };
+      const n = Number(cmd.limit ?? 10);
+      const [cmp, prompts, notes] = await Promise.all([
+        c.from(tableName("comparisons")).select("id,device,created_at,prompt").order("created_at", { ascending: false }).limit(n),
+        c.from(tableName("prompts")).select("id,folder,title,created_at").order("created_at", { ascending: false }).limit(n),
+        c.from(tableName("notes")).select("id,service_id,created_at").order("created_at", { ascending: false }).limit(n),
+      ]);
+      return {
+        comparisons: (cmp.data ?? []).map((r) => ({ ...r, prompt: String(r.prompt ?? "").slice(0, 40) })),
+        prompts: prompts.data ?? [],
+        notes: notes.data ?? [],
+        errors: [cmp.error?.message, prompts.error?.message, notes.error?.message].filter(Boolean),
+      };
+    }
     case "probes":
       return probeRecords();
     case "last_pipeline": {
@@ -160,7 +178,7 @@ async function execute(cmd: Command): Promise<unknown> {
 }
 
 /** 긴 명령(pipeline·broadcast)이 도는 동안에도 실행해도 되는 읽기 전용 명령 */
-const CONCURRENT_TYPES = new Set(["status", "eval", "last_pipeline", "probes", "ui_eval"]);
+const CONCURRENT_TYPES = new Set(["status", "eval", "last_pipeline", "probes", "ui_eval", "recent_rows"]);
 
 async function tick() {
   const cmd = await readStore<Command>("dev_commands").catch(() => null);

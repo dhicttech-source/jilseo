@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { readStore, writeStore } from "../lib/store";
-import { deleteOrQueue, getClient, saveRow } from "../lib/supabase";
+import { deleteOrQueue, getClient, saveRow, tableName } from "../lib/supabase";
 import { useCloud } from "./cloud";
 
 export interface Prompt {
@@ -41,7 +41,7 @@ export const useLibrary = create<LibraryState>((set, get) => ({
   async refresh() {
     const c = getClient(useCloud.getState().config());
     if (!c || useCloud.getState().status !== "signed_in") return;
-    const { data, error } = await c.from("prompts").select("id,folder,title,body,created_at").order("folder").order("created_at");
+    const { data, error } = await c.from(tableName("prompts")).select("id,folder,title,body,created_at").order("folder").order("created_at");
     if (error) return set({ message: `동기화 실패: ${error.message}` });
     set({ prompts: data as Prompt[], message: null });
     await cache(data as Prompt[]);

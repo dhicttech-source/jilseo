@@ -63,6 +63,13 @@ export async function currentUser(cfg: SupabaseConfig | null): Promise<User | nu
 // ---------- 오프라인 큐 (지시문 §5: 저장 실패 시 로컬 큐잉 후 재시도) ----------
 
 export type QueueTable = "prompts" | "notes" | "comparisons";
+
+/**
+ * 논리 테이블명 → 실제 테이블명. 2026-10-08부터 사용자의 기존 Supabase 프로젝트에 함께 두므로 jilseo_ 접두어를 붙인다.
+ * 큐 파일(queue.json)에는 논리명이 저장되어 있어 접두어가 바뀌어도 호환된다.
+ */
+export const TABLE_PREFIX = "jilseo_";
+export const tableName = (table: QueueTable) => `${TABLE_PREFIX}${table}`;
 interface QueueItem {
   id: string;
   table: QueueTable;
@@ -112,7 +119,7 @@ export async function insertOrQueue(
 ): Promise<"saved" | "queued"> {
   const c = getClient(cfg);
   if (c) {
-    const { error } = await c.from(table).insert(row);
+    const { error } = await c.from(tableName(table)).insert(row);
     if (!error) return "saved";
   }
   await enqueue({ table, op: "insert", row });
@@ -122,7 +129,7 @@ export async function insertOrQueue(
 export async function deleteOrQueue(cfg: SupabaseConfig | null, table: QueueTable, id: string): Promise<"saved" | "queued"> {
   const c = getClient(cfg);
   if (c) {
-    const { error } = await c.from(table).delete().eq("id", id);
+    const { error } = await c.from(tableName(table)).delete().eq("id", id);
     if (!error) return "saved";
   }
   await enqueue({ table, op: "delete", row: { id } });
@@ -138,7 +145,7 @@ export async function updateOrQueue(
 ): Promise<"saved" | "queued"> {
   const c = getClient(cfg);
   if (c) {
-    const { error } = await c.from(table).update(patch).eq("id", id);
+    const { error } = await c.from(tableName(table)).update(patch).eq("id", id);
     if (!error) return "saved";
   }
   await enqueue({ table, op: "update", row: { id, ...patch } });
@@ -163,10 +170,10 @@ export async function flushQueue(cfg: SupabaseConfig | null): Promise<number> {
 
 /** 큐 항목 1건을 종류대로 다시 보낸다 */
 function replay(c: SupabaseClient, item: QueueItem) {
-  if (item.op === "insert") return c.from(item.table).insert(item.row);
+  if (item.op === "insert") return c.from(tableName(item.table)).insert(item.row);
   if (item.op === "update") {
     const { id, ...patch } = item.row;
-    return c.from(item.table).update(patch).eq("id", String(id));
+    return c.from(tableName(item.table)).update(patch).eq("id", String(id));
   }
-  return c.from(item.table).delete().eq("id", String(item.row.id));
+  return c.from(tableName(item.table)).delete().eq("id", String(item.row.id));
 }

@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+### Changed (2026-10-08)
+- 클라우드 저장소를 별도 Free 프로젝트에서 사용자의 기존 Supabase 프로젝트로 통합. 테이블은 `jilseo_prompts`·`jilseo_notes`·`jilseo_comparisons`(접두어)로 생성(`supabase/schema.sql`), 앱은 논리명 → 실제명 변환 한 곳을 거친다. 오프라인 큐는 논리명을 저장하므로 호환
+- Free 일시정지 방지 keepalive(launchd `com.dhict.jilseo.keepalive`, `scripts/keepalive.sh`) 제거
+- 설정 화면 안내: URL·키 저장 뒤 그 프로젝트의 기존 계정으로 로그인해야 "로그인됨"이 된다는 설명 추가
+- 하네스 `recent_rows`(최근 기록의 기기·시각, 동기화 확인용)
+
 ## [0.1.2] — 2026-09-30
 
 ### 요약 (사용자 관점)

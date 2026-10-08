@@ -1,6 +1,6 @@
 import { create } from "zustand";
 import { aggregate, type ComparisonRow, type Scorecard } from "../lib/scorecard";
-import { getClient } from "../lib/supabase";
+import { getClient, tableName } from "../lib/supabase";
 import { useCloud } from "./cloud";
 
 /** 성적표: Supabase comparisons 최근 500행을 읽어 집계한다. 로그인 필요, 캐시 없음. */
@@ -29,7 +29,7 @@ export const useScorecard = create<ScorecardState>((set) => ({
     }
     set({ loading: true, message: null });
     const { data, error } = await c
-      .from("comparisons")
+      .from(tableName("comparisons"))
       .select("id,responses,created_at")
       .order("created_at", { ascending: false })
       .limit(MAX_ROWS);

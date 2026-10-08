@@ -1,9 +1,10 @@
 -- 질서(jilseo) Supabase 스키마 — 지시문 §5
+-- 2026-10-08부터 사용자의 기존(유료) Supabase 프로젝트에 함께 둔다. 다른 테이블과 충돌하지 않도록 jilseo_ 접두어.
 -- Supabase 대시보드 > SQL Editor 에서 그대로 실행한다. 여러 번 실행해도 안전(idempotent).
 
 create extension if not exists pgcrypto;
 
-create table if not exists public.prompts (
+create table if not exists public.jilseo_prompts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users not null default auth.uid(),
   folder text,
@@ -13,7 +14,7 @@ create table if not exists public.prompts (
   updated_at timestamptz default now()
 );
 
-create table if not exists public.notes (
+create table if not exists public.jilseo_notes (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users not null default auth.uid(),
   service_id text,
@@ -22,7 +23,7 @@ create table if not exists public.notes (
   created_at timestamptz default now()
 );
 
-create table if not exists public.comparisons (
+create table if not exists public.jilseo_comparisons (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users not null default auth.uid(),
   prompt text not null,
@@ -34,26 +35,23 @@ create table if not exists public.comparisons (
   created_at timestamptz default now()
 );
 
-create index if not exists prompts_user_folder_idx on public.prompts (user_id, folder, created_at desc);
-create index if not exists notes_user_created_idx on public.notes (user_id, created_at desc);
-create index if not exists comparisons_user_created_idx on public.comparisons (user_id, created_at desc);
+create index if not exists jilseo_prompts_user_folder_idx on public.jilseo_prompts (user_id, folder, created_at desc);
+create index if not exists jilseo_notes_user_created_idx on public.jilseo_notes (user_id, created_at desc);
+create index if not exists jilseo_comparisons_user_created_idx on public.jilseo_comparisons (user_id, created_at desc);
 
-alter table public.prompts enable row level security;
-alter table public.notes enable row level security;
-alter table public.comparisons enable row level security;
+alter table public.jilseo_prompts enable row level security;
+alter table public.jilseo_notes enable row level security;
+alter table public.jilseo_comparisons enable row level security;
 
--- RLS: 본인 행만 (auth.uid() = user_id)
-drop policy if exists "own rows" on public.prompts;
-create policy "own rows" on public.prompts
+-- RLS: 본인 행만 (auth.uid() = user_id). 같은 프로젝트의 다른 사용자에게는 보이지 않는다.
+drop policy if exists "own rows" on public.jilseo_prompts;
+create policy "own rows" on public.jilseo_prompts
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-drop policy if exists "own rows" on public.notes;
-create policy "own rows" on public.notes
+drop policy if exists "own rows" on public.jilseo_notes;
+create policy "own rows" on public.jilseo_notes
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
-drop policy if exists "own rows" on public.comparisons;
-create policy "own rows" on public.comparisons
+drop policy if exists "own rows" on public.jilseo_comparisons;
+create policy "own rows" on public.jilseo_comparisons
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
-
--- Free 프로젝트 일시정지 방지용 (Mac Studio cron에서 REST로 호출):
---   curl -s "$SUPABASE_URL/rest/v1/comparisons?select=count" -H "apikey: $ANON_KEY" -H "Authorization: Bearer $ANON_KEY"

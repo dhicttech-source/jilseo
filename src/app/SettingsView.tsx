@@ -62,10 +62,11 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
         </div>
 
         <section className="flex flex-col gap-3 rounded-lg border border-white/10 p-4">
-          <h2 className="text-sm font-medium text-white/85">Supabase (Free 프로젝트 `jilseo`)</h2>
+          <h2 className="text-sm font-medium text-white/85">Supabase (기존 프로젝트에 함께 사용)</h2>
           <p className="text-xs text-white/40">
-            프롬프트 라이브러리·메모·비교 기록을 두 맥 간 공유합니다. 대시보드 → Project Settings → API Keys 의 Project URL과 Publishable key (Secret key는 넣지 마세요).
-            <code className="ml-1 text-white/60">supabase/schema.sql</code>을 SQL Editor에서 먼저 실행하세요.
+            프롬프트 라이브러리·메모·비교 기록·성적표를 두 기기 간 공유합니다. 사용 중인 Supabase 프로젝트의 Project Settings → API Keys 에서 Project URL과 Publishable key를 넣으세요(Secret key는 넣지 마세요).
+            먼저 <code className="text-white/60">supabase/schema.sql</code>을 그 프로젝트의 SQL Editor에서 실행하면 <code className="text-white/60">jilseo_</code> 접두어 테이블이 생깁니다.
+            저장 뒤 아래에서 그 프로젝트의 기존 계정으로 로그인해야 "로그인됨"이 됩니다.
           </p>
           <Field label="Project URL">
             <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://xxxx.supabase.co" className={input} />
