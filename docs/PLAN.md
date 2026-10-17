@@ -63,7 +63,7 @@ jilseo/
 
 1. rustup 설치 (stable), `rustup target` 확인
 2. `npm create tauri-app` (react-ts, vite) → `~/dev/jilseo`에 스캐폴딩, git init
-   - GitHub 원격 저장소 생성: `gh repo create dhicttech-source/jilseo --private` (계정 dhicttech-source), 초기 커밋 push
+   - GitHub 원격 저장소 생성: `dhicttech-source/jilseo` (2026-10-17 공개 전환, MIT), 초기 커밋 push
 3. `src-tauri` 설정: `unstable` feature, macOS 최소 버전 14.0, ad-hoc 서명
 4. Rust 커맨드 `create_panel(service_id, url, rect)` / `layout_panels(rects)` / `destroy_panel` 구현
    - `data_store_identifier` = 서비스 id의 고정 해시 16바이트

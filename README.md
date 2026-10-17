@@ -2,6 +2,10 @@
 
 여러 AI 웹 서비스(ChatGPT · Claude · Gemini · Grok · Perplexity)를 한 창의 패널로 띄우고, 프롬프트 하나를 동시에 보내거나 **생성 → 검증 파이프라인**으로 돌리는 개인용 macOS/Windows 데스크톱 앱입니다. API를 쓰지 않고 각 서비스의 웹 화면에 직접 입력합니다(계정·로그인은 서비스 웹뷰가 관리).
 
+> **English**: jilseo is a personal desktop app (Tauri 2) that opens several AI web services side by side, broadcasts one prompt to all of them, or runs a *generate → verify* pipeline: one service answers, the others critique it through "verification lenses" (fact, logic, risk, …), and a scorecard tracks which service catches real issues. No API keys: it types into each service's own web UI, so your existing subscriptions apply. Downloads are on the [Releases](https://github.com/dhicttech-source/jilseo/releases) page; see [CONTRIBUTING.md](CONTRIBUTING.md) to help.
+
+**다운로드**: [Releases](https://github.com/dhicttech-source/jilseo/releases) — macOS(Apple Silicon) dmg, Windows x64 설치 파일.
+
 ## 할 수 있는 것
 
 - **동시 전송**: 스테이지의 모든 AI 패널에 같은 프롬프트(+파일 1개)를 보내고 응답을 마크다운으로 모아 비교 기록으로 저장
@@ -27,6 +31,16 @@ npm run dmg           # 릴리스 빌드 + 안내문 동봉 dmg
 ```
 
 Rust(rustup)와 Xcode Command Line Tools가 필요합니다. 서비스별 DOM 셀렉터는 `services/*.json`이며, 앱 데이터 폴더(`~/Library/Application Support/jilseo/services/`)의 복사본을 고치면 재시작 시 반영됩니다.
+
+## 기여
+
+버그 제보, 셀렉터 실측 보고, 렌즈·프리셋 제안, PR 모두 환영합니다. 방법과 원칙은 [CONTRIBUTING.md](CONTRIBUTING.md)에 있습니다. 핵심 원칙은 세 가지입니다: API를 쓰지 않는다, 자동 반복 전송을 만들지 않는다, 셀렉터는 실측값만 기입한다.
+
+## 알아 둘 것
+
+- 개인 용도 도구입니다. 각 AI 서비스의 이용약관은 사용자가 확인하세요. 서비스 UI가 바뀌면 `services/*.json`의 셀렉터를 다시 실측해야 합니다.
+- 일부 서비스(특히 무료 플랜)는 긴 프롬프트나 검색이 붙는 질문에서 응답이 비거나 끊길 수 있습니다. `docs/CHANGELOG.md`의 "알려진 제약"을 보세요.
+- 라이선스: [MIT](LICENSE)
 
 ## 문서
 

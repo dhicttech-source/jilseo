@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+### Changed (2026-10-17)
+- 저장소 공개 전환(MIT 라이선스). 기여 안내(`CONTRIBUTING.md`)와 이슈·PR 템플릿 추가, README 영어 요약·면책 문구·Release 다운로드 링크. 내부 사업 문서 3편은 저장소에서 제거
+- GitHub Release v0.1.3에 macOS dmg와 Windows 설치 파일 첨부
+
 ## [0.1.3] — 2026-10-08
 
 ### 요약 (사용자 관점)
