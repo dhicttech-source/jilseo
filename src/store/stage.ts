@@ -6,6 +6,7 @@ import { assignRole, type PanelRole, type RoleMap, type SendMode } from "../lib/
 import { DEFAULT_VERIFY_TEMPLATE } from "../lib/verifyPrompt";
 import { COMPOSITE_LENS_ID, type Lens } from "../lib/lenses";
 import { applyPreset, findPreset, type Depth } from "../lib/presets";
+import { validateServices } from "../lib/serviceSchema";
 
 export type PanelPhase =
   | "creating"
@@ -236,15 +237,18 @@ export const useStage = create<StageState>((set, get) => ({
       measureViewportInset().catch(() => ({ top: 0 })),
     ]);
     const webSlots = settings?.webSlots ?? [];
-    const services = composeServices(svcRes.services, webSlots);
+    // 서비스 JSON 스키마 검증: 잘못된 정의는 제외하고 사유를 헤더에 표시
+    const checked = validateServices(svcRes.services, (item) => `${(item as { id?: string })?.id ?? "?"}.json`);
+    const serviceErrors = [...svcRes.errors, ...checked.errors];
+    const services = composeServices(checked.services, webSlots);
     const stage = sanitizeStage(settings?.stage ?? DEFAULT_STAGE, services);
     const maximized = settings?.maximized && stage.includes(settings.maximized) ? settings.maximized : null;
     set({
       loaded: true,
       services,
-      baseServices: svcRes.services,
+      baseServices: checked.services,
       webSlots,
-      serviceErrors: svcRes.errors,
+      serviceErrors,
       servicesDir: dir,
       stage,
       columns: clampColumns(settings?.columns ?? 3),

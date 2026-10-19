@@ -1,5 +1,8 @@
 import { GRADE_LABEL, type Grade, type Judged } from "../lib/lenses";
 import { depthOf, findPreset, sortByLensOrder } from "../lib/presets";
+import { pipelineToMarkdown } from "../lib/exportMarkdown";
+import { copyText, saveExport } from "../lib/exportFile";
+import { useState } from "react";
 import { usePipelineResult } from "../store/pipelineResult";
 import { useStage } from "../store/stage";
 
@@ -29,8 +32,25 @@ export function VerdictCard() {
   const services = useStage((s) => s.services);
   const setMaximized = useStage((s) => s.setMaximized);
   const maximized = useStage((s) => s.maximized);
+  const [note, setNote] = useState<string | null>(null);
   if (!result) return null;
   const name = (id: string) => services.find((x) => x.id === id)?.name ?? id;
+  const toMarkdown = () =>
+    pipelineToMarkdown({
+      prompt: result.prompt,
+      generatorName: name(result.generator),
+      answer: result.answer,
+      verifiers: result.verifiers.map((v) => ({ name: name(v.serviceId), lensName: v.lens.name, text: v.text, verdict: v.verdict, sent: v.sent })),
+      revised: result.revised,
+      presetName: findPreset(result.presetId ?? undefined)?.name,
+      depthLabel: depthOf(result.depth).label,
+      at: result.at,
+      ephemeral: result.ephemeral,
+    });
+  const flash = (m: string) => {
+    setNote(m);
+    setTimeout(() => setNote(null), 3000);
+  };
   // 표시 순서: 긍정 → 사실 → 추론 → 부정 → 개선 (설계 §4). 패널 자체는 옮기지 않는다
   const ordered = sortByLensOrder(result.verifiers, (v) => v.lens.id);
   const preset = findPreset(result.presetId ?? undefined);
@@ -41,15 +61,30 @@ export function VerdictCard() {
         <span className="font-medium text-white/85">판정 요약</span>
         <span>
           {name(result.generator)} 생성 → 검증 {result.verifiersSent}/{result.verifiersTotal} · {Math.round(result.ms / 1000)}s
-          {result.saved !== "skipped" && ` · 기록 ${result.saved === "saved" ? "저장" : "큐"}`}
+          {result.saved !== "skipped" ? ` · 기록 ${result.saved === "saved" ? "저장" : "큐"}` : result.ephemeral ? " · 🔒 기록 안 함" : ""}
           {` · ${preset ? preset.name + " · " : ""}${depthOf(result.depth).label}`}
           {result.skipped.length > 0 && ` · 생략 ${result.skipped.map(name).join(", ")}`}
         </span>
+        {note && <span className="text-xs text-sky-300">{note}</span>}
+        <button
+          onClick={() => void copyText(toMarkdown()).then((ok) => flash(ok ? "Markdown 복사됨" : "복사 실패"))}
+          className="ml-auto rounded px-2 py-0.5 text-white/60 hover:bg-white/10 hover:text-white/90"
+          title="질문·생성 답변·검증 판정·수정본을 Markdown으로 클립보드에 복사"
+        >
+          Markdown 복사
+        </button>
+        <button
+          onClick={() => void saveExport(toMarkdown(), "pipeline", result.at).then((p) => flash(`저장: ${p.split("/").pop()}`)).catch((e) => flash(`저장 실패: ${String(e)}`))}
+          className="rounded px-2 py-0.5 text-white/60 hover:bg-white/10 hover:text-white/90"
+          title="앱 데이터 폴더 exports/에 .md로 저장"
+        >
+          저장
+        </button>
         {!result.revised && result.verifiersSent > 0 && (
           <button
             onClick={() => void revise()}
             disabled={revising}
-            className="ml-auto rounded border border-emerald-400/40 px-2 py-0.5 text-emerald-200 hover:bg-emerald-400/15 disabled:opacity-40"
+            className="rounded border border-emerald-400/40 px-2 py-0.5 text-emerald-200 hover:bg-emerald-400/15 disabled:opacity-40"
             title="검증 판정을 생성 패널의 같은 대화에 보내 지적을 반영한 수정본을 받습니다 (전송 1회)"
           >
             {revising ? "수정본 작성 중…" : "지적 반영 수정본 요청"}
@@ -57,7 +92,7 @@ export function VerdictCard() {
         )}
         <button
           onClick={() => setMaximized(maximized === result.generator ? null : result.generator)}
-          className={(result.revised || result.verifiersSent === 0 ? "ml-auto " : "") + "rounded px-2 py-0.5 text-white/60 hover:bg-white/10 hover:text-white/90"}
+          className="rounded px-2 py-0.5 text-white/60 hover:bg-white/10 hover:text-white/90"
           title="판정을 먼저 읽고 나서 생성 답변 원문을 크게 봅니다"
         >
           {maximized === result.generator ? "원문 닫기" : "생성 원문 크게 보기"}

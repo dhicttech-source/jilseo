@@ -5,6 +5,7 @@ import { useCloud } from "../store/cloud";
 import { BUILTIN_LENSES, VERDICT_BLOCK, resolveLens } from "../lib/lenses";
 import { DEFAULT_REVISE_TEMPLATE, REVISE_TEMPLATE_KEY } from "../lib/revise";
 import { UI_SCALES, useStage } from "../store/stage";
+import { openExportsDir } from "../lib/exportFile";
 
 const input = "rounded border border-white/15 bg-white/5 px-2 py-1.5 text-sm text-white/90 outline-none focus:border-white/40";
 
@@ -295,6 +296,9 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
             className="self-start rounded bg-white/10 px-3 py-1 text-xs text-white/80"
           >
             앱 데이터 폴더 열기 (settings · workstations · queue)
+          </button>
+          <button onClick={() => void openExportsDir()} className="self-start rounded bg-white/10 px-3 py-1 text-xs text-white/80">
+            내보내기 폴더 열기 (exports/*.md)
           </button>
         </section>
       </div>

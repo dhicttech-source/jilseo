@@ -143,6 +143,28 @@ pub fn write_store(app: AppHandle, name: String, value: Value) -> Result<(), Str
 }
 
 /// 앱 데이터 폴더 경로 (온보딩 안내용)
+/// 내보내기 파일 저장: 앱 데이터 폴더의 exports/<name>. 파일명은 호출자가 안전한 형태로 만든다(여기서 경로 구분자 제거).
+#[tauri::command]
+pub fn write_export(app: AppHandle, name: String, content: String) -> Result<String, String> {
+    let dir = app_dir(&app)?.join("exports");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    let safe: String = name
+        .chars()
+        .map(|c| if matches!(c, '/' | '\\' | ':' | '\0') { '_' } else { c })
+        .collect();
+    let path = dir.join(if safe.is_empty() { "export.md".to_string() } else { safe });
+    fs::write(&path, content).map_err(|e| e.to_string())?;
+    Ok(path.to_string_lossy().to_string())
+}
+
+/// 내보내기 폴더 경로 (없으면 만든다)
+#[tauri::command]
+pub fn exports_dir(app: AppHandle) -> Result<String, String> {
+    let dir = app_dir(&app)?.join("exports");
+    fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
+    Ok(dir.to_string_lossy().to_string())
+}
+
 #[tauri::command]
 pub fn app_data_dir(app: AppHandle) -> Result<String, String> {
     Ok(app_dir(&app)?.to_string_lossy().into_owned())

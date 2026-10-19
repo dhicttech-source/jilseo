@@ -9,6 +9,7 @@ import { saveRow, updateOrQueue } from "./supabase";
 import { verifyKey } from "./verifyPrompt";
 import { useAttachment } from "../store/attachment";
 import { useCloud } from "../store/cloud";
+import { useSession } from "../store/session";
 import { useStage } from "../store/stage";
 
 export type PipelineStep = "generate" | "verify" | "revise" | "done";
@@ -38,6 +39,8 @@ export interface PipelineResult {
   presetId: string | null;
   /** 깊이 상한으로 이번 실행에서 빠진 검증 패널 id */
   skipped: string[];
+  /** 임시 전송으로 실행되어 클라우드에 저장하지 않음 */
+  ephemeral: boolean;
   /** 수정 단계 결과 (심층 깊이 자동, 그 외 카드 버튼). 없으면 미실행 */
   revised?: string;
   reviseError?: string;
@@ -130,14 +133,18 @@ export async function runPipeline(
   });
 
   const rowId = crypto.randomUUID();
-  const cloud = useCloud.getState();
-  const saved = await saveRow(cloud.config(), cloud.user, "comparisons", {
-    id: rowId,
-    prompt: body,
-    responses: buildResponsesRow(gen.id, answer, verifiers, undefined, { presetId, depth }),
-    device,
-  });
-  void cloud.flush();
+  const ephemeral = useSession.getState().ephemeral;
+  let saved: "saved" | "queued" | "skipped" = "skipped";
+  if (!ephemeral) {
+    const cloud = useCloud.getState();
+    saved = await saveRow(cloud.config(), cloud.user, "comparisons", {
+      id: rowId,
+      prompt: body,
+      responses: buildResponsesRow(gen.id, answer, verifiers, undefined, { presetId, depth }),
+      device,
+    });
+    void cloud.flush();
+  }
   if (attachment) moveToNewChatAfterFile([gen]);
 
   const verifiersSent = verifiers.filter((v) => v.sent).length;
@@ -155,6 +162,7 @@ export async function runPipeline(
     depth,
     presetId,
     skipped,
+    ephemeral,
   };
   // 심층 깊이: 판정을 생성 패널에 되돌려 수정본까지 받는다 (전송 +1, 고정 순서)
   const final = depth === "deep" && verifiersSent > 0 ? await runRevise(result, onProgress) : result;

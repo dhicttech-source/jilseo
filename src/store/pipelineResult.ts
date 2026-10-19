@@ -42,7 +42,7 @@ export const usePipelineResult = create<PipelineResultState>((set, get) => ({
     const verifiers = r.verifiers.map((v) => (v.serviceId === serviceId ? { ...v, verdict: { ...v.verdict, judged } } : v));
     const next = { ...r, verifiers };
     set({ result: next });
-    if (r.saved === "skipped") return "skipped";
+    if (r.saved === "skipped") return "skipped"; // 임시 전송·미저장 기록은 로컬에만 반영
     const cloud = useCloud.getState();
     const res = await updateOrQueue(cloud.config(), "comparisons", r.rowId, {
       responses: buildResponsesRow(r.generator, r.answer, verifiers, r.revised, { presetId: r.presetId, depth: r.depth }),

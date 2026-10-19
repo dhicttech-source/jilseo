@@ -4,7 +4,7 @@
  * import.meta.env.DEV 에서만 시작되므로 dmg(프로덕션)에는 동작하지 않는다.
  *
  * dev_commands.json: { "id": "c1", "type": "broadcast", "text": "..." }
- * types: status | broadcast | pipeline | last_pipeline | revise | scorecard | ui_eval | set_mode | set_role | set_lens | apply_preset | set_depth | judge | diagnose | memo | apply_stage | set_columns
+ * types: status | broadcast | pipeline | last_pipeline | revise | scorecard | ui_eval | set_ephemeral | export | set_mode | set_role | set_lens | apply_preset | set_depth | judge | diagnose | memo | apply_stage | set_columns
  *        | maximize | select_in_panel | eval | attach | add_web_slot | remove_web_slot
  */
 import { readStore, writeStore } from "./store";
@@ -16,6 +16,10 @@ import type { Depth } from "./presets";
 import { usePipelineResult } from "../store/pipelineResult";
 import { probeRecords } from "./devProbe";
 import { useScorecard } from "../store/scorecard";
+import { useSession } from "../store/session";
+import { pipelineToMarkdown } from "./exportMarkdown";
+import { saveExport } from "./exportFile";
+import { depthOf } from "./presets";
 import { getClient, tableName } from "./supabase";
 import { findPreset } from "./presets";
 import { recommend } from "./scorecard";
@@ -56,6 +60,7 @@ async function execute(cmd: Command): Promise<unknown> {
         lensAssign: stage.lensAssign,
         depth: stage.depth,
         presetId: stage.presetId,
+        ephemeral: useSession.getState().ephemeral,
       };
     case "broadcast": {
       const o = await runBroadcastAndWaitSent(String(cmd.text));
@@ -102,6 +107,32 @@ async function execute(cmd: Command): Promise<unknown> {
         notes: notes.data ?? [],
         errors: [cmp.error?.message, prompts.error?.message, notes.error?.message].filter(Boolean),
       };
+    }
+    case "set_ephemeral":
+      useSession.getState().setEphemeral(cmd.value === true);
+      return { ephemeral: useSession.getState().ephemeral };
+    case "export": {
+      if (typeof cmd.markdown === "string") {
+        // 테스트용: 임의 Markdown 저장 (파일 쓰기 경로 확인)
+        const path = await saveExport(cmd.markdown, "pipeline");
+        return { path, length: cmd.markdown.length };
+      }
+      const r = usePipelineResult.getState().result;
+      if (!r) return { error: "no pipeline result" };
+      const name = (id: string) => stage.services.find((x) => x.id === id)?.name ?? id;
+      const md = pipelineToMarkdown({
+        prompt: r.prompt,
+        generatorName: name(r.generator),
+        answer: r.answer,
+        verifiers: r.verifiers.map((v) => ({ name: name(v.serviceId), lensName: v.lens.name, text: v.text, verdict: v.verdict, sent: v.sent })),
+        revised: r.revised,
+        presetName: findPreset(r.presetId ?? undefined)?.name,
+        depthLabel: depthOf(r.depth).label,
+        at: r.at,
+        ephemeral: r.ephemeral,
+      });
+      const path = await saveExport(md, "pipeline", r.at);
+      return { path, length: md.length, head: md.slice(0, 300) };
     }
     case "probes":
       return probeRecords();

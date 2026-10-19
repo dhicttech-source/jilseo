@@ -11,6 +11,9 @@ import { useDraft } from "../store/draft";
 import { useLibrary } from "../store/library";
 import { usePipelineResult } from "../store/pipelineResult";
 import { useScorecard } from "../store/scorecard";
+import { useSession } from "../store/session";
+import { broadcastToMarkdown } from "../lib/exportMarkdown";
+import { copyText, saveExport } from "../lib/exportFile";
 import { useStage } from "../store/stage";
 
 const lensLabel = (id: string) => BUILTIN_LENSES.find((l) => l.id === id)?.name ?? id;
@@ -51,7 +54,20 @@ export function BroadcastBar() {
   const setLens = useStage((s) => s.setLens);
   const card = useScorecard((s) => s.card);
   const setResult = usePipelineResult((s) => s.set);
+  const ephemeral = useSession((s) => s.ephemeral);
+  const setEphemeral = useSession((s) => s.setEphemeral);
+  const lastBroadcast = useSession((s) => s.lastBroadcast);
   const pipeline = mode === "pipeline";
+
+  const lastBroadcastMarkdown = () =>
+    lastBroadcast
+      ? broadcastToMarkdown({
+          prompt: lastBroadcast.prompt,
+          responses: Object.entries(lastBroadcast.responses).map(([id, text]) => ({ name: services.find((x) => x.id === id)?.name ?? id, text })),
+          at: lastBroadcast.at,
+          ephemeral: lastBroadcast.ephemeral,
+        })
+      : "";
   const resolved = resolvePipelineRoles(stage, roles, services);
   void lensAssign; // 렌즈 배정이 바뀌면 placeholder를 다시 그린다
 
@@ -127,7 +143,7 @@ export function BroadcastBar() {
     if (outcome.okCount > 0) setText("");
     taRef.current?.focus();
     const { saved } = await outcome.completion;
-    if (saved !== "skipped") setSummary((s) => `${s ?? ""} · 비교 기록 ${saved === "saved" ? "저장" : "큐"}`);
+    setSummary((s) => `${s ?? ""} · ${saved !== "skipped" ? `비교 기록 ${saved === "saved" ? "저장" : "큐"}` : useSession.getState().ephemeral ? "기록 안 함" : "응답 수집 완료"}`);
   };
 
   return (
@@ -141,6 +157,17 @@ export function BroadcastBar() {
           e.target.value = "";
         }}
       />
+      <button
+        onClick={() => setEphemeral(!ephemeral)}
+        disabled={busy}
+        title={ephemeral ? "임시 전송 켜짐: 이번 세션의 전송은 비교 기록·판정을 클라우드에 저장하지 않습니다. 클릭하면 끔" : "임시 전송: 켜면 비교 기록을 저장하지 않습니다 (민감한 프롬프트용). 앱을 다시 열면 꺼집니다"}
+        className={
+          "h-12 shrink-0 rounded-lg border px-3 text-base " +
+          (ephemeral ? "border-amber-400/50 bg-amber-400/15 text-amber-200" : "border-white/10 text-white/50 hover:bg-white/10")
+        }
+      >
+        {ephemeral ? "🔒" : "🔓"}
+      </button>
       <button
         onClick={() => fileRef.current?.click()}
         title="파일 1개를 모든 패널에 동시 첨부 (8MB 이하)"
@@ -234,6 +261,24 @@ export function BroadcastBar() {
           >
             성적표 추천 반영: {actionable.map((r) => `${services.find((x) => x.id === r.model)?.name ?? r.model}→${lensLabel(r.lens)}`).join(" · ")}
           </button>
+        )}
+        {!pipeline && lastBroadcast && !busy && (
+          <span className="flex gap-1">
+            <button
+              onClick={() => void copyText(lastBroadcastMarkdown()).then((ok) => setSummary(ok ? "Markdown 복사됨" : "복사 실패"))}
+              className="rounded border border-white/15 px-2 py-0.5 text-xs text-white/60 hover:bg-white/10"
+              title="마지막 동시 전송 결과(질문·서비스별 응답)를 Markdown으로 클립보드에 복사"
+            >
+              Markdown 복사
+            </button>
+            <button
+              onClick={() => void saveExport(lastBroadcastMarkdown(), "broadcast", lastBroadcast.at).then((p) => setSummary(`저장: ${p.split("/").pop()}`)).catch((e) => setSummary(`저장 실패: ${String(e)}`))}
+              className="rounded border border-white/15 px-2 py-0.5 text-xs text-white/60 hover:bg-white/10"
+              title="앱 데이터 폴더 exports/에 .md로 저장"
+            >
+              저장
+            </button>
+          </span>
         )}
         {summary && <span className="text-xs text-white/50">{summary}</span>}
         <button

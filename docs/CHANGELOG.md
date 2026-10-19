@@ -2,6 +2,13 @@
 
 ## [Unreleased]
 
+### Added (2026-10-19, LibreChat 검토 반영 1~4)
+- **임시 전송** 🔒: 전송 바 토글. 켜면 이번 세션의 동시 전송·파이프라인 결과를 클라우드에 저장하지 않는다(채택·수정본 갱신도 생략). 앱을 다시 열면 꺼짐
+- **Markdown 내보내기**: 요약 카드와 전송 바에 "Markdown 복사"·"저장". 질문·생성 답변·검증 판정(등급·건수·핵심·채택)·수정본, 또는 동시 전송의 서비스별 응답을 `.md`로. 저장은 앱 데이터 폴더 `exports/`(설정에서 열기)
+- **셀렉터 JSON 스키마 검증**(zod): 앱 시작 시 잘못된 `services/*.json`은 제외하고 헤더 "서비스 정의 오류"에 파일·필드·사유 표시. 저장소의 JSON 전부를 vitest가 같은 스키마로 전수 검사
+- **CI**(`.github/workflows/ci.yml`): PR·main 푸시마다 타입 검사와 테스트
+- 하네스 `set_ephemeral`, `export`
+
 ### Changed (2026-10-17)
 - 저장소 공개 전환(MIT 라이선스). 기여 안내(`CONTRIBUTING.md`)와 이슈·PR 템플릿 추가, README 영어 요약·면책 문구·Release 다운로드 링크. 내부 사업 문서 3편은 저장소에서 제거
 - GitHub Release v0.1.3에 macOS dmg와 Windows 설치 파일 첨부
