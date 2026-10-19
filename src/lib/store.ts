@@ -8,6 +8,7 @@ export type StoreName =
   | "prompts_cache"
   | "notes_cache"
   | "favorites"
+  | "usage"
   | "dev_commands"
   | "dev_results"
   | "dev_heartbeat";

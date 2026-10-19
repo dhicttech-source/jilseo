@@ -66,6 +66,10 @@ interface Settings {
   depth?: Depth;
   /** 마지막으로 적용한 프리셋 id (표시용) */
   presetId?: string | null;
+  /** 서비스별 하루 전송 한도 경고 (0·미설정 = 없음). 전송을 막지는 않는다 */
+  usageLimits?: Record<string, number>;
+  /** 동시 전송·파이프라인 생성 단계 프롬프트 앞에 붙는 접두어 (워크스테이션별 개인화) */
+  promptPrefix?: string;
 }
 
 export const UI_SCALES = [1, 1.15, 1.3, 1.5] as const;
@@ -141,15 +145,26 @@ interface StageState {
   customLenses: Lens[];
   depth: Depth;
   presetId: string | null;
+  usageLimits: Record<string, number>;
+  promptPrefix: string;
 
   init(): Promise<void>;
+  setUsageLimit(serviceId: string, limit: number): void;
+  setPromptPrefix(prefix: string): void;
   setDepth(depth: Depth): void;
   /** 프리셋 적용: 역할·렌즈 배정과 기본 깊이를 바꾼다. 반환: 배정 결과(표시용). 모르는 id면 null */
   applyPresetToStage(presetId: string): ReturnType<typeof applyPreset> | null;
   setMode(mode: SendMode): void;
   setRole(id: string, role: PanelRole): void;
   /** 워크스테이션 복원용: 모드·역할·렌즈 배정을 한 번에 교체 */
-  restorePipeline(mode: SendMode | undefined, roles: RoleMap | undefined, lensAssign?: Record<string, string>, depth?: Depth, presetId?: string | null): void;
+  restorePipeline(
+    mode: SendMode | undefined,
+    roles: RoleMap | undefined,
+    lensAssign?: Record<string, string>,
+    depth?: Depth,
+    presetId?: string | null,
+    promptPrefix?: string,
+  ): void;
   setLens(serviceId: string, lensId: string): void;
   /** 템플릿 덮어쓰기. 빈 문자열이면 덮어쓰기 제거(기본 복원) */
   setLensOverride(lensId: string, template: string): void;
@@ -176,7 +191,7 @@ function persist(get: () => StageState) {
   saveTimer = setTimeout(() => {
     const {
       stage, columns, maximized, supabase, device, onboarded, webSlots, newChatAfterFile, uiScale, mode, roles,
-      lensAssign, lensOverrides, customLenses, depth, presetId,
+      lensAssign, lensOverrides, customLenses, depth, presetId, usageLimits, promptPrefix,
     } = get();
     const settings: Settings = {
       version: 1,
@@ -196,6 +211,8 @@ function persist(get: () => StageState) {
       customLenses,
       depth,
       presetId,
+      usageLimits,
+      promptPrefix,
     };
     invoke("write_settings", { settings }).catch(() => {});
   }, 200);
@@ -225,6 +242,8 @@ export const useStage = create<StageState>((set, get) => ({
   customLenses: [],
   depth: "standard",
   presetId: null,
+  usageLimits: {},
+  promptPrefix: "",
 
   async init() {
     const [svcRes, settings, dir, inset] = await Promise.all([
@@ -266,6 +285,8 @@ export const useStage = create<StageState>((set, get) => ({
       customLenses: settings?.customLenses ?? [],
       depth: settings?.depth ?? "standard",
       presetId: settings?.presetId ?? null,
+      usageLimits: settings?.usageLimits ?? {},
+      promptPrefix: settings?.promptPrefix ?? "",
     });
     applyUiScale(settings?.uiScale ?? DEFAULT_UI_SCALE);
   },
@@ -281,8 +302,30 @@ export const useStage = create<StageState>((set, get) => ({
     persist(get);
   },
 
-  restorePipeline(mode, roles, lensAssign, depth, presetId) {
-    set({ mode: mode ?? "broadcast", roles: roles ?? {}, lensAssign: lensAssign ?? {}, depth: depth ?? "standard", presetId: presetId ?? null });
+  restorePipeline(mode, roles, lensAssign, depth, presetId, promptPrefix) {
+    set({
+      mode: mode ?? "broadcast",
+      roles: roles ?? {},
+      lensAssign: lensAssign ?? {},
+      depth: depth ?? "standard",
+      presetId: presetId ?? null,
+      promptPrefix: promptPrefix ?? "",
+    });
+    persist(get);
+  },
+
+  setUsageLimit(serviceId, limit) {
+    set((s) => {
+      const next = { ...s.usageLimits };
+      if (limit > 0) next[serviceId] = Math.floor(limit);
+      else delete next[serviceId];
+      return { usageLimits: next };
+    });
+    persist(get);
+  },
+
+  setPromptPrefix(prefix) {
+    set({ promptPrefix: prefix });
     persist(get);
   },
 

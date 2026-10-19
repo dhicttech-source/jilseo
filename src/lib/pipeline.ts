@@ -5,6 +5,7 @@ import { depthOf, findPreset, limitByDepth, type Depth } from "./presets";
 import { DEFAULT_REVISE_TEMPLATE, REVISE_TEMPLATE_KEY, buildRevisePrompt, revisedKey } from "./revise";
 import { resolvePipelineRoles } from "./roles";
 import { PIPELINE_META_KEY, type PipelineMeta } from "./scorecard";
+import { composePrompt } from "./promptVars";
 import { saveRow, updateOrQueue } from "./supabase";
 import { verifyKey } from "./verifyPrompt";
 import { useAttachment } from "../store/attachment";
@@ -93,9 +94,9 @@ export async function runPipeline(
   onProgress: (step: PipelineStep, detail: string) => void = () => {},
   attachment: Attachment | null = useAttachment.getState().file,
 ): Promise<PipelineResult> {
-  const body = text.trim();
+  const { stage, roles, services, device, depth, presetId, promptPrefix } = useStage.getState();
+  const body = composePrompt(promptPrefix, text); // 접두어는 생성 단계에만 (검증·수정 프롬프트에는 붙이지 않음)
   if (!body) throw new Error("보낼 내용이 없습니다");
-  const { stage, roles, services, device, depth, presetId } = useStage.getState();
   const resolved = resolvePipelineRoles(stage, roles, services);
   if (resolved.error || !resolved.generator) throw new Error(resolved.error ?? "생성 패널이 없습니다");
   const gen = resolved.generator;

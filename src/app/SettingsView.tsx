@@ -30,6 +30,9 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
   const uiScale = useStage((s) => s.uiScale);
   const setUiScale = useStage((s) => s.setUiScale);
   const setNewChatAfterFile = useStage((s) => s.setNewChatAfterFile);
+  const baseServices = useStage((s) => s.baseServices);
+  const usageLimits = useStage((s) => s.usageLimits);
+  const setUsageLimit = useStage((s) => s.setUsageLimit);
   const lensOverrides = useStage((s) => s.lensOverrides);
   const customLenses = useStage((s) => s.customLenses);
   const setLensOverride = useStage((s) => s.setLensOverride);
@@ -183,6 +186,28 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
               </span>
             </span>
           </label>
+        </section>
+
+        <section className="flex flex-col gap-3 rounded-lg border border-white/10 p-4">
+          <h2 className="text-sm font-medium text-white/85">전송 횟수 한도 경고</h2>
+          <p className="text-xs text-white/40">
+            서비스별 오늘 전송 횟수는 독의 칩에 표시됩니다. 하루 한도를 적어 두면 도달했을 때 전송 바가 경고합니다(전송을 막지는 않음). 0이면 경고 없음. 무료 플랜의 메시지 제한을 미리 알아채는 용도입니다.
+          </p>
+          <div className="flex flex-wrap gap-3">
+            {baseServices.map((svc) => (
+              <label key={svc.id} className="flex items-center gap-2 text-xs text-white/70">
+                <span className="w-20">{svc.name}</span>
+                <input
+                  type="number"
+                  min={0}
+                  value={usageLimits[svc.id] ?? 0}
+                  onChange={(e) => setUsageLimit(svc.id, Number(e.target.value) || 0)}
+                  className={input + " w-20"}
+                />
+                <span className="text-white/35">회/일</span>
+              </label>
+            ))}
+          </div>
         </section>
 
         <section className="flex flex-col gap-3 rounded-lg border border-white/10 p-4">

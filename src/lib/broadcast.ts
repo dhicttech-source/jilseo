@@ -13,6 +13,8 @@ import { useAttachment } from "../store/attachment";
 import { useCloud } from "../store/cloud";
 import { useSession } from "../store/session";
 import { useStage } from "../store/stage";
+import { useUsage } from "../store/usage";
+import { composePrompt } from "./promptVars";
 
 export type SentResults = Record<string, { ok: boolean; detail?: string }>;
 
@@ -40,6 +42,7 @@ export async function sendAndCollect(
   await Promise.all(adapters.map(async (a) => baselines.set(a.id, await a.snapshotResponse())));
   const sent = await broadcastText(text, adapters, (id, phase, detail) => setStatus(id, phase, detail), attachment);
   onSent?.(sent);
+  void useUsage.getState().record(Object.entries(sent).filter(([, r]) => r.ok).map(([id]) => id)); // 전송 횟수 기록
   const responses: Record<string, string> = {};
   await Promise.all(
     adapters
@@ -71,8 +74,8 @@ export function runBroadcast(
   targets?: ServiceDef[],
   attachment: Attachment | null = useAttachment.getState().file,
 ): BroadcastOutcome | null {
-  const body = text.trim();
-  const { services, stage, device } = useStage.getState();
+  const { services, stage, device, promptPrefix } = useStage.getState();
+  const body = composePrompt(promptPrefix, text); // 워크스테이션 접두어 (기록에는 실제 전송 텍스트를 남긴다)
   const defs = (
     targets ?? stage.map((id) => services.find((s) => s.id === id)).filter((s): s is ServiceDef => !!s)
   ).filter(isBroadcastTarget);

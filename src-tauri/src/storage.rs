@@ -110,7 +110,7 @@ pub fn write_diagnostics(app: AppHandle, report: Value) -> Result<String, String
 
 /// 범용 JSON 스토어. 이름은 화이트리스트로 제한한다.
 const STORE_NAMES: &[&str] = &[
-    "workstations", "presets", "session", "queue", "prompts_cache", "notes_cache", "favorites",
+    "workstations", "presets", "session", "queue", "prompts_cache", "notes_cache", "favorites", "usage",
     // 개발 빌드 전용 테스트 하네스 (dmg에는 하네스 코드가 포함되지 않음)
     "dev_commands", "dev_results", "dev_heartbeat",
 ];

@@ -12,6 +12,8 @@ import { useLibrary } from "../store/library";
 import { usePipelineResult } from "../store/pipelineResult";
 import { useScorecard } from "../store/scorecard";
 import { useSession } from "../store/session";
+import { useUsage } from "../store/usage";
+import { overLimit } from "../lib/usage";
 import { broadcastToMarkdown } from "../lib/exportMarkdown";
 import { copyText, saveExport } from "../lib/exportFile";
 import { useStage } from "../store/stage";
@@ -54,6 +56,11 @@ export function BroadcastBar() {
   const setLens = useStage((s) => s.setLens);
   const card = useScorecard((s) => s.card);
   const setResult = usePipelineResult((s) => s.set);
+  const promptPrefix = useStage((s) => s.promptPrefix);
+  const setPromptPrefix = useStage((s) => s.setPromptPrefix);
+  const [prefixOpen, setPrefixOpen] = useState(false);
+  const today = useUsage((s) => s.today);
+  const usageLimits = useStage((s) => s.usageLimits);
   const ephemeral = useSession((s) => s.ephemeral);
   const setEphemeral = useSession((s) => s.setEphemeral);
   const lastBroadcast = useSession((s) => s.lastBroadcast);
@@ -104,6 +111,7 @@ export function BroadcastBar() {
     .filter((s): s is NonNullable<typeof s> => !!s)
     .filter(isBroadcastTarget);
   const canSend = pipeline ? !resolved.error : targets.length > 0;
+  const limitHits = overLimit(today, usageLimits, (pipeline ? [resolved.generator, ...resolved.verifiers].filter((x): x is NonNullable<typeof x> => !!x) : targets).map((t) => t.id));
   const placeholder = !targets.length
     ? "스테이지에 패널이 없습니다"
     : pipeline
@@ -147,7 +155,28 @@ export function BroadcastBar() {
   };
 
   return (
-    <div className="flex shrink-0 items-end gap-2 border-t border-white/10 px-3 py-2">
+    <div className="flex shrink-0 flex-col border-t border-white/10">
+      {(prefixOpen || promptPrefix.trim()) && (
+        <div className="flex items-start gap-2 px-3 pt-2 text-xs">
+          <span className="mt-1.5 shrink-0 text-white/50" title="동시 전송과 파이프라인 생성 단계의 프롬프트 앞에 붙습니다. 검증·수정 프롬프트에는 붙지 않고, 워크스테이션에 저장됩니다">접두어</span>
+          <textarea
+            value={promptPrefix}
+            onChange={(e) => setPromptPrefix(e.target.value)}
+            rows={2}
+            placeholder="예: 답변은 한국어로, 근거가 되는 출처를 끝에 적어 주세요."
+            className="min-h-8 flex-1 resize-y rounded border border-white/10 bg-white/5 px-2 py-1 text-white/80 outline-none placeholder:text-white/25 focus:border-white/30"
+          />
+          <button onClick={() => { setPromptPrefix(""); setPrefixOpen(false); }} className="mt-1 rounded px-1.5 text-white/40 hover:bg-white/10" title="접두어 지우기">
+            ✕
+          </button>
+        </div>
+      )}
+      {limitHits.length > 0 && (
+        <div className="px-3 pt-2 text-xs text-rose-300">
+          오늘 전송 한도 도달: {limitHits.map((h) => `${services.find((x) => x.id === h.id)?.name ?? h.id} ${h.count}/${h.limit}`).join(" · ")} — 무료 플랜이면 응답이 비거나 막힐 수 있습니다
+        </div>
+      )}
+    <div className="flex shrink-0 items-end gap-2 px-3 py-2">
       <input
         ref={fileRef}
         type="file"
@@ -220,6 +249,16 @@ export function BroadcastBar() {
         </div>
       )}
       <button
+        onClick={() => setPrefixOpen((v) => !v)}
+        title="프롬프트 접두어 (워크스테이션별로 저장)"
+        className={
+          "h-12 shrink-0 rounded-lg border px-3 text-sm " +
+          (promptPrefix.trim() ? "border-violet-400/50 bg-violet-400/15 text-violet-200" : prefixOpen ? "border-white/30 bg-white/15 text-white/90" : "border-white/10 text-white/50 hover:bg-white/10")
+        }
+      >
+        접두어
+      </button>
+      <button
         onClick={toggleLibrary}
         title="프롬프트 라이브러리"
         className={
@@ -289,6 +328,7 @@ export function BroadcastBar() {
           {busy ? (pipeline ? "진행 중…" : "전송 중…") : "▶ 보내기"}
         </button>
       </div>
+    </div>
     </div>
   );
 }

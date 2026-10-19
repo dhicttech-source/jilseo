@@ -1,4 +1,5 @@
 import { useMemo, useState } from "react";
+import { extractVars, fillVars } from "../lib/promptVars";
 import { useDraft } from "../store/draft";
 import { useLibrary } from "../store/library";
 
@@ -13,6 +14,19 @@ export function PromptLibrary() {
   const [folder, setFolder] = useState<string | null>(null);
   const [adding, setAdding] = useState(false);
   const [form, setForm] = useState({ folder: "", title: "", body: "" });
+  /** 변수({{이름}})가 있는 프롬프트를 클릭하면 값을 묻는 폼. 없으면 즉시 삽입 */
+  const [filling, setFilling] = useState<{ id: string; body: string; vars: string[]; values: Record<string, string> } | null>(null);
+
+  const pick = (p: { id: string; body: string }) => {
+    const vars = extractVars(p.body);
+    if (vars.length === 0) return insert(p.body);
+    setFilling({ id: p.id, body: p.body, vars, values: Object.fromEntries(vars.map((v) => [v, ""])) });
+  };
+  const commitFill = () => {
+    if (!filling) return;
+    insert(fillVars(filling.body, filling.values));
+    setFilling(null);
+  };
 
   const folders = useMemo(() => {
     const set = new Set(prompts.map((p) => p.folder ?? "(없음)"));
@@ -83,14 +97,45 @@ export function PromptLibrary() {
               className="flex-1 resize-none rounded border border-white/15 bg-white/5 px-2 py-1 text-white/90 outline-none"
             />
           </div>
+        ) : filling ? (
+          <div className="flex flex-1 flex-col gap-1 overflow-y-auto p-2">
+            <div className="text-white/50">
+              변수 {filling.vars.length}개를 채우세요. 비워 두면 <code className="text-white/70">{"{{이름}}"}</code>이 그대로 남습니다.
+            </div>
+            {filling.vars.map((v, i) => (
+              <label key={v} className="flex items-center gap-2">
+                <span className="w-28 shrink-0 truncate text-white/70" title={v}>{v}</span>
+                <input
+                  autoFocus={i === 0}
+                  value={filling.values[v]}
+                  onChange={(e) => setFilling({ ...filling, values: { ...filling.values, [v]: e.target.value } })}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") commitFill();
+                    if (e.key === "Escape") setFilling(null);
+                  }}
+                  className="flex-1 rounded border border-white/15 bg-white/5 px-2 py-1 text-white/90 outline-none"
+                />
+              </label>
+            ))}
+            <div className="mt-auto flex gap-1">
+              <button onClick={commitFill} className="rounded bg-white/90 px-3 py-1 font-medium text-black">
+                삽입
+              </button>
+              <button onClick={() => setFilling(null)} className="rounded px-2 py-1 text-white/50 hover:bg-white/10">
+                취소
+              </button>
+              <span className="ml-auto truncate text-white/30" title={filling.body}>{fillVars(filling.body, filling.values).slice(0, 80)}</span>
+            </div>
+          </div>
         ) : (
           <div className="flex flex-1 flex-col gap-0.5 overflow-y-auto p-2">
             {message && <div className="text-amber-400">{message}</div>}
             {shown.length === 0 && <div className="text-white/30">프롬프트가 없습니다. + 추가로 만들거나 로그인 후 ↻로 불러오세요.</div>}
             {shown.map((p) => (
               <div key={p.id} className="group flex items-start gap-2 rounded px-2 py-1 hover:bg-white/5">
-                <button onClick={() => insert(p.body)} className="min-w-0 flex-1 text-left" title="입력창에 삽입">
+                <button onClick={() => pick(p)} className="min-w-0 flex-1 text-left" title={extractVars(p.body).length ? `변수 ${extractVars(p.body).join(", ")} 채운 뒤 삽입` : "입력창에 삽입"}>
                   <span className="text-white/85">{p.title || p.body.slice(0, 40)}</span>
+                  {extractVars(p.body).length > 0 && <span className="ml-2 rounded bg-sky-400/15 px-1 text-sky-200">{"{{ }}"} {extractVars(p.body).length}</span>}
                   {p.folder && <span className="ml-2 text-white/30">{p.folder}</span>}
                   <div className="truncate text-white/40">{p.body}</div>
                 </button>

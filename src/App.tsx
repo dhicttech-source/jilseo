@@ -14,6 +14,7 @@ import { useLibrary } from "./store/library";
 import { useStage } from "./store/stage";
 import { useWorkstations } from "./store/workstations";
 import { useFavorites } from "./store/favorites";
+import { useUsage } from "./store/usage";
 import { runDiagnostics, summarize } from "./lib/diagnostics";
 import { startDevHarness } from "./lib/devHarness";
 
@@ -52,6 +53,7 @@ export default function App() {
       {
         await useWorkstations.getState().load();
         await useFavorites.getState().load();
+        await useUsage.getState().load();
         await useCloud.getState().init();
         await useLibrary.getState().load();
       }

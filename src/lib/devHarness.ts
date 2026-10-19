@@ -4,7 +4,7 @@
  * import.meta.env.DEV 에서만 시작되므로 dmg(프로덕션)에는 동작하지 않는다.
  *
  * dev_commands.json: { "id": "c1", "type": "broadcast", "text": "..." }
- * types: status | broadcast | pipeline | last_pipeline | revise | scorecard | ui_eval | set_ephemeral | export | set_mode | set_role | set_lens | apply_preset | set_depth | judge | diagnose | memo | apply_stage | set_columns
+ * types: status | broadcast | pipeline | last_pipeline | revise | scorecard | ui_eval | set_ephemeral | export | usage | set_prefix | set_mode | set_role | set_lens | apply_preset | set_depth | judge | diagnose | memo | apply_stage | set_columns
  *        | maximize | select_in_panel | eval | attach | add_web_slot | remove_web_slot
  */
 import { readStore, writeStore } from "./store";
@@ -17,6 +17,7 @@ import { usePipelineResult } from "../store/pipelineResult";
 import { probeRecords } from "./devProbe";
 import { useScorecard } from "../store/scorecard";
 import { useSession } from "../store/session";
+import { useUsage } from "../store/usage";
 import { pipelineToMarkdown } from "./exportMarkdown";
 import { saveExport } from "./exportFile";
 import { depthOf } from "./presets";
@@ -61,6 +62,7 @@ async function execute(cmd: Command): Promise<unknown> {
         depth: stage.depth,
         presetId: stage.presetId,
         ephemeral: useSession.getState().ephemeral,
+        promptPrefix: stage.promptPrefix,
       };
     case "broadcast": {
       const o = await runBroadcastAndWaitSent(String(cmd.text));
@@ -134,6 +136,11 @@ async function execute(cmd: Command): Promise<unknown> {
       const path = await saveExport(md, "pipeline", r.at);
       return { path, length: md.length, head: md.slice(0, 300) };
     }
+    case "usage":
+      return { today: useUsage.getState().today, limits: stage.usageLimits, log: useUsage.getState().log };
+    case "set_prefix":
+      stage.setPromptPrefix(String(cmd.prefix ?? ""));
+      return { promptPrefix: useStage.getState().promptPrefix };
     case "probes":
       return probeRecords();
     case "last_pipeline": {

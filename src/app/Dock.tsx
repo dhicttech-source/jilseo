@@ -2,6 +2,7 @@ import { useState } from "react";
 import { isTodoSelector } from "../adapters";
 import { useFavorites } from "../store/favorites";
 import { MAX_PANELS, useStage } from "../store/stage";
+import { useUsage } from "../store/usage";
 
 export function Dock() {
   const services = useStage((s) => s.services);
@@ -14,6 +15,8 @@ export function Dock() {
   const favorites = useFavorites((s) => s.list);
   const addFavorite = useFavorites((s) => s.add);
   const removeFavorite = useFavorites((s) => s.remove);
+  const today = useUsage((s) => s.today);
+  const usageLimits = useStage((s) => s.usageLimits);
   const [urlOpen, setUrlOpen] = useState(false);
   const [url, setUrl] = useState("");
   const full = stage.length >= MAX_PANELS;
@@ -52,6 +55,14 @@ export function Dock() {
               {isWeb && <span className="mr-1 text-white/40">🌐</span>}
               {svc.name}
               {todo && <span className="ml-1 text-amber-400">·</span>}
+              {!isWeb && (today[svc.id] ?? 0) > 0 && (
+                <span
+                  className={"ml-1.5 rounded-full px-1.5 text-xs " + ((usageLimits[svc.id] ?? 0) > 0 && today[svc.id] >= usageLimits[svc.id] ? "bg-rose-400/25 text-rose-200" : "bg-white/10 text-white/50")}
+                  title={`오늘 전송 ${today[svc.id]}회${usageLimits[svc.id] ? ` / 한도 ${usageLimits[svc.id]}` : ""}`}
+                >
+                  {today[svc.id]}
+                </span>
+              )}
             </button>
             {isWeb && (
               <>
