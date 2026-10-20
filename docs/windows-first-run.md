@@ -2,7 +2,7 @@
 
 ## 설치 파일 받기
 1. GitHub 저장소 → **Actions** → `windows-build` → 가장 최근 성공한 실행 클릭
-2. 아래 **Artifacts**의 `jilseo-windows-x64` 다운로드 → 압축 해제 → `jilseo_0.1.3_x64-setup.exe`
+2. 아래 **Artifacts**의 `jilseo-windows-x64` 다운로드 → 압축 해제 → `jilseo_0.1.4_x64-setup.exe`
 
 ## 설치
 - 더블클릭 → **SmartScreen** 파란 경고("Windows의 PC 보호")가 뜨면 **추가 정보 → 실행**

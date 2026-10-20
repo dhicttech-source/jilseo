@@ -1,6 +1,6 @@
 [package]
 name = "jilseo"
-version = "0.1.3"
+version = "0.1.4"
 description = "질서(疾書) — Multi-AI Broadcast"
 authors = ["dhicttech"]
 edition = "2021"
