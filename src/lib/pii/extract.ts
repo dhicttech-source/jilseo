@@ -60,8 +60,10 @@ export function bytesToBase64(bytes: Uint8Array): string {
   return btoa(bin);
 }
 
-/** UTF-8 우선, 깨지면 EUC-KR(한국어 레거시 문서) */
+/** UTF-16(BOM), UTF-8 우선, 깨지면 EUC-KR(한국어 레거시 문서) */
 export function decodeText(bytes: Uint8Array): string {
+  if (bytes[0] === 0xff && bytes[1] === 0xfe) return new TextDecoder("utf-16le").decode(bytes.subarray(2));
+  if (bytes[0] === 0xfe && bytes[1] === 0xff) return new TextDecoder("utf-16be").decode(bytes.subarray(2));
   try {
     return new TextDecoder("utf-8", { fatal: true }).decode(bytes).replace(/^﻿/, "");
   } catch {
@@ -71,6 +73,33 @@ export function decodeText(bytes: Uint8Array): string {
       return new TextDecoder("utf-8").decode(bytes);
     }
   }
+}
+
+/** 디코딩 결과를 믿을 수 없으면(NUL·대체 문자가 많음) 읽을 수 없는 파일로 본다 */
+export function looksBinary(text: string): boolean {
+  if (!text) return false;
+  const sample = text.slice(0, 20000);
+  const bad = (sample.match(/[\u0000\uFFFD]/g) ?? []).length;
+  return bad / sample.length > 0.02;
+}
+
+/**
+ * 마크업·JSON의 이스케이프를 풀어 탐지를 우회하지 못하게 한다 (예: &#54861;&#44600;&#46041; = 홍길동, \uD64D…).
+ * 구조를 깨는 문자(< > & " ' \ 제어문자)는 풀지 않는다.
+ */
+const SAFE_CHAR = (cp: number) => cp >= 0x20 && ![0x22, 0x26, 0x27, 0x3c, 0x3e, 0x5c].includes(cp);
+export function unescapeForScan(text: string, ext: string): string {
+  let t = text;
+  if (["html", "htm", "xml", "svg", "md", "markdown", "txt"].includes(ext))
+    t = t.replace(/&#(?:(\d{1,7})|x([0-9a-fA-F]{1,6}));/g, (m, dec, hex) => {
+      const cp = dec ? Number(dec) : parseInt(hex, 16);
+      return cp <= 0x10ffff && SAFE_CHAR(cp) ? String.fromCodePoint(cp) : m;
+    });
+  if (["json", "js", "ts", "jsx", "tsx", "py", "java", "kt", "txt", "log"].includes(ext))
+    t = t
+      .replace(/\\u([dD][89abAB][0-9a-fA-F]{2})\\u([dD][c-fC-F][0-9a-fA-F]{2})/g, (_m, hi, lo) => String.fromCharCode(parseInt(hi, 16), parseInt(lo, 16)))
+      .replace(/\\u([0-9a-fA-F]{4})/g, (m, h) => (SAFE_CHAR(parseInt(h, 16)) && (parseInt(h, 16) < 0xd800 || parseInt(h, 16) > 0xdfff) ? String.fromCharCode(parseInt(h, 16)) : m));
+  return t;
 }
 
 // ---------- XML 공통 ----------
@@ -229,7 +258,12 @@ export async function extractAttachmentText(att: Attachment, pdfLoader?: PdfText
   const kind = attachmentKind(att.name, att.mime);
   try {
     const bytes = base64ToBytes(att.data);
-    if (kind === "text") return { kind, text: decodeText(bytes), converted: false };
+    if (kind === "text") {
+      const decoded = decodeText(bytes);
+      if (looksBinary(decoded)) return { kind: "unsupported", text: null, converted: false, note: "텍스트 인코딩을 확인할 수 없어 내용을 검사할 수 없습니다" };
+      // 이스케이프를 푼 형태로 탐지·가림하고, 보낼 때도 그 형태로 보낸다 (가린 부분이 다시 이스케이프로 남지 않게)
+      return { kind, text: unescapeForScan(decoded, splitName(att.name).ext), converted: false };
+    }
     if (kind === "docx") return { kind, text: docxToText(unzipSync(bytes)), converted: true, note: "Word 문서를 텍스트로 변환합니다(서식·이미지 제외)" };
     if (kind === "pptx") return { kind, text: pptxToText(unzipSync(bytes)), converted: true, note: "PowerPoint를 텍스트로 변환합니다(도형 배치·이미지 제외)" };
     if (kind === "xlsx") {

@@ -52,7 +52,13 @@ export async function preparePayload(
 
 /** 첨부를 읽지 못했으면 가릴 수 없으므로 반드시 사용자에게 묻는다 */
 export const attachmentUnreadable = (p: PreparedSend) => !!p.attachment && p.extracted?.text == null;
-export const needsReview = (p: PreparedSend) => p.groups.length > 0 || attachmentUnreadable(p);
+/**
+ * 변환 문서(docx·pptx·xlsx·PDF)는 원본에 검사하지 않은 부분(작성자 메타데이터·이미지·텍스트 상자 등)이 남으므로,
+ * 탐지 결과가 없어도 원본을 그대로 통과시키지 않는다 — 검토 모드는 패널을 열고, 자동 모드는 변환본을 보낸다.
+ * 일부 생략(truncated)된 경우도 마찬가지.
+ */
+export const attachmentHasUncheckedParts = (p: PreparedSend) => !!p.attachment && !!p.extracted && (p.extracted.converted || !!p.extracted.truncated);
+export const needsReview = (p: PreparedSend) => p.groups.length > 0 || attachmentUnreadable(p) || attachmentHasUncheckedParts(p);
 export const defaultAttachmentChoice = (p: PreparedSend): AttachmentChoice => (attachmentUnreadable(p) ? "remove" : "masked");
 
 export function finalizePayload(p: PreparedSend, groups: PiiGroup[], choice: AttachmentChoice): FinalPayload {

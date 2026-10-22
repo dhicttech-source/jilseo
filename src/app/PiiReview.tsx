@@ -88,7 +88,11 @@ export function PiiReview({
               </button>
             ))}
           </span>
-          {choice === "original" && <span className="w-full text-rose-200">원본 첨부는 내용이 그대로 전송됩니다. 아래 체크는 프롬프트에만 적용됩니다.</span>}
+          {choice === "original" && (
+            <span className="w-full text-rose-200">
+              원본 첨부는 내용이 그대로 전송됩니다{prep.extracted?.converted ? "(작성자 등 문서 정보·이미지·텍스트 상자처럼 검사하지 않은 부분 포함)" : ""}. 아래 체크는 프롬프트에만 적용됩니다.
+            </span>
+          )}
         </div>
       )}
 

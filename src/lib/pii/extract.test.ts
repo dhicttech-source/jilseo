@@ -170,3 +170,27 @@ function tinyPdf(text: string): Uint8Array {
   out += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xref}\n%%EOF\n`;
   return new TextEncoder().encode(out);
 }
+
+describe("보안 검토 반영: 인코딩 우회", () => {
+  it("HTML 숫자 엔티티로 쓴 이름·이메일을 풀어서 탐지한다 (구조 문자는 유지)", async () => {
+    const html = "<p>&#54861;&#44600;&#46041; &#44284;&#51109; &lt;b&gt; hong&#64;example.com</p>";
+    const ex = await extractAttachmentText(att("a.html", new TextEncoder().encode(html), "text/html"));
+    expect(ex.text).toBe("<p>홍길동 과장 &lt;b&gt; hong@example.com</p>");
+  });
+  it("JSON \\u 이스케이프(서로게이트 포함)를 풀되 따옴표·역슬래시는 유지", async () => {
+    const json = '{"n":"\\uD64D\\uAE38\\uB3D9 \\uACFC\\uC7A5","q":"\\u0022","e":"\\ud83d\\ude00"}';
+    const ex = await extractAttachmentText(att("a.json", new TextEncoder().encode(json), "application/json"));
+    expect(ex.text).toBe('{"n":"홍길동 과장","q":"\\u0022","e":"😀"}');
+  });
+  it("UTF-16(BOM) 파일을 올바르게 읽고, 깨진 바이너리는 읽을 수 없음으로", async () => {
+    const s = "홍길동 010-1234-5678";
+    const le = new Uint8Array(2 + s.length * 2);
+    le[0] = 0xff; le[1] = 0xfe;
+    for (let i = 0; i < s.length; i++) { const c = s.charCodeAt(i); le[2 + i * 2] = c & 0xff; le[3 + i * 2] = c >> 8; }
+    expect((await extractAttachmentText(att("u16.txt", le))).text).toBe(s);
+    const bin = new Uint8Array(400).map((_, i) => (i % 3 === 0 ? 0 : 0x41));
+    const ex = await extractAttachmentText(att("bin.txt", bin));
+    expect(ex.text).toBeNull();
+    expect(ex.note).toContain("인코딩");
+  });
+});

@@ -87,14 +87,15 @@ function replacerFor(g: PiiGroup): RegExp {
     return new RegExp(`(?<!\\d)${digits.join("[-.\\s]?")}(?!\\d)`, "g");
   }
   const body = escapeRe(g.original).replace(/\s+/g, "\\s+");
-  if (g.kind === "person") return new RegExp(`(?<![가-힣A-Za-z0-9])${body}(?=[${PARTICLE_START}]|[^가-힣]|$)`, "g");
+  // 탐지(대소문자 무시)와 치환이 어긋나면 철자만 다른 등장이 새어 나가므로 모든 종류를 대소문자 무시로 바꾼다
+  if (g.kind === "person") return new RegExp(`(?<![가-힣A-Za-z0-9])${body}(?=[${PARTICLE_START}]|[^가-힣]|$)`, "gi");
   if (g.kind === "org") {
     // "(주)한빛소프트"를 가리면 법인 표기 없이 쓴 "한빛소프트"도 같은 기호로 (긴 쪽 먼저)
     const stem = orgStem(g.original);
     const alts = stem && stem !== g.original ? [body, escapeRe(stem).replace(/\s+/g, "\\s+")] : [body];
     return new RegExp(alts.join("|"), "gi");
   }
-  return new RegExp(body, g.kind === "email" ? "gi" : "g");
+  return new RegExp(body, "gi");
 }
 
 /** 기관명에서 법인 표기를 뗀 고유명 부분. 2글자 미만이면 null */

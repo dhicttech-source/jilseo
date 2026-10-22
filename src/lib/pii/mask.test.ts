@@ -130,3 +130,20 @@ describe("preparePayload / finalizePayload", () => {
     expect(needsReview(await preparePayload("날씨 알려줘", null, {}))).toBe(false);
   });
 });
+
+describe("보안 검토 반영", () => {
+  it("철자 대소문자만 다른 등장도 모두 가린다 (탐지와 치환 일치)", () => {
+    const sources = [src("p", "Project Aurora, aurora 일정, AURORA 예산")];
+    const { texts } = applyMask(sources, buildGroups(sources, { always: ["Aurora"] }).groups);
+    expect(texts.p).toBe("Project [가림1], [가림1] 일정, [가림1] 예산");
+  });
+  it("변환 문서는 탐지가 없어도 검토 대상 (원본 통과 금지)", async () => {
+    const { zipSync, strToU8 } = await import("fflate");
+    const docx = zipSync({ "word/document.xml": strToU8("<w:document><w:body><w:p><w:r><w:t>날씨 보고</w:t></w:r></w:p></w:body></w:document>") });
+    const att = { name: "a.docx", mime: "", size: docx.length, data: bytesToBase64(docx) };
+    const p = await preparePayload("요약해 줘", att, {});
+    expect(p.groups).toHaveLength(0);
+    expect(needsReview(p)).toBe(true);
+    expect(finalizePayload(p, p.groups, "masked").attachment!.name).toBe("a_가림.txt");
+  });
+});
