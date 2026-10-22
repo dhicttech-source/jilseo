@@ -1,5 +1,19 @@
 import { useRef, useState } from "react";
-import { isBroadcastTarget } from "../adapters";
+import { isBroadcastTarget, type Attachment } from "../adapters";
+import { composePrompt } from "../lib/promptVars";
+import { restore } from "../lib/pii/mask";
+import { browserPdfLoader } from "../lib/pii/pdfLoader";
+import {
+  attachmentUnreadable,
+  defaultAttachmentChoice,
+  finalizePayload,
+  needsReview,
+  passthroughMeta,
+  preparePayload,
+  type PiiMode,
+} from "../lib/pii/prepare";
+import type { SendOptions } from "../lib/broadcast";
+import { PiiReview, type ReviewState } from "./PiiReview";
 import { runBroadcast } from "../lib/broadcast";
 import { lensFor, runPipeline } from "../lib/pipeline";
 import { BUILTIN_PRESETS, DEPTHS, findPreset } from "../lib/presets";
@@ -64,17 +78,25 @@ export function BroadcastBar() {
   const ephemeral = useSession((s) => s.ephemeral);
   const setEphemeral = useSession((s) => s.setEphemeral);
   const lastBroadcast = useSession((s) => s.lastBroadcast);
+  const piiMode = useStage((s) => s.piiMode);
+  const setPiiMode = useStage((s) => s.setPiiMode);
+  const piiAlways = useStage((s) => s.piiAlways);
+  const piiNever = useStage((s) => s.piiNever);
+  const [review, setReview] = useState<ReviewState | null>(null);
+  const [restoreExport, setRestoreExport] = useState(false);
   const pipeline = mode === "pipeline";
 
-  const lastBroadcastMarkdown = () =>
-    lastBroadcast
-      ? broadcastToMarkdown({
-          prompt: lastBroadcast.prompt,
-          responses: Object.entries(lastBroadcast.responses).map(([id, text]) => ({ name: services.find((x) => x.id === id)?.name ?? id, text })),
-          at: lastBroadcast.at,
-          ephemeral: lastBroadcast.ephemeral,
-        })
-      : "";
+  const lastBroadcastMarkdown = () => {
+    if (!lastBroadcast) return "";
+    const md = broadcastToMarkdown({
+      prompt: lastBroadcast.prompt,
+      responses: Object.entries(lastBroadcast.responses).map(([id, text]) => ({ name: services.find((x) => x.id === id)?.name ?? id, text })),
+      at: lastBroadcast.at,
+      ephemeral: lastBroadcast.ephemeral,
+    });
+    // 가림 대응표가 있으면 이 기기에서만 원래 값으로 되돌린 사본
+    return restoreExport && lastBroadcast.pii?.length ? restore(md, lastBroadcast.pii) : md;
+  };
   const resolved = resolvePipelineRoles(stage, roles, services);
   void lensAssign; // 렌즈 배정이 바뀌면 placeholder를 다시 그린다
 
@@ -110,7 +132,7 @@ export function BroadcastBar() {
     .map((id) => services.find((s) => s.id === id))
     .filter((s): s is NonNullable<typeof s> => !!s)
     .filter(isBroadcastTarget);
-  const canSend = pipeline ? !resolved.error : targets.length > 0;
+  const canSend = (pipeline ? !resolved.error : targets.length > 0) && !review;
   const limitHits = overLimit(today, usageLimits, (pipeline ? [resolved.generator, ...resolved.verifiers].filter((x): x is NonNullable<typeof x> => !!x) : targets).map((t) => t.id));
   const placeholder = !targets.length
     ? "스테이지에 패널이 없습니다"
@@ -120,29 +142,27 @@ export function BroadcastBar() {
         : `${resolved.generator?.name} 생성 → ${resolved.verifiers.map((v) => `${v.name}(${lensFor(v.id).name})`).join(" · ")} 검증  (⌘⏎)`
       : `${targets.map((t) => t.name).join(" · ")} 에게 동시에 보내기  (⌘⏎)`;
 
-  const sendPipeline = async (body: string) => {
+  const sendPipeline = async (body: string, att: Attachment | null, opts: SendOptions, original: string) => {
     setSummary("생성 중…");
     setText("");
     setResult(null);
     try {
-      const r = await runPipeline(body, (_step, detail) => setSummary(detail));
+      const r = await runPipeline(body, (_step, detail) => setSummary(detail), att, opts);
       setResult(r); // 요약 카드(VerdictCard)가 판정과 채택 버튼을 보여 준다
       setSummary(`검증 ${r.verifiersSent}/${r.verifiersTotal} · ${Math.round(r.ms / 1000)}s` + (r.skipped.length ? ` · 깊이 상한으로 ${r.skipped.length}개 생략` : ""));
     } catch (e) {
       setSummary(`파이프라인 실패: ${e instanceof Error ? e.message : String(e)}`);
-      setText(body); // 실패하면 입력을 되돌려 다시 시도할 수 있게
+      setText(original); // 실패하면 (가리기 전) 입력을 되돌려 다시 시도할 수 있게
     }
     setBusy(false);
     taRef.current?.focus();
   };
 
-  const send = async () => {
-    const body = text.trim();
-    if (!body || busy || !canSend) return;
-    setBusy(true);
-    setSummary(null);
-    if (pipeline) return sendPipeline(body);
-    const outcome = runBroadcast(body, targets);
+  /** 실제 전송 (비식별 관문 통과 후). text는 접두어까지 합쳐진 최종 텍스트 */
+  const dispatch = async (body: string, att: Attachment | null, opts: SendOptions, original: string) => {
+    if (useAttachment.getState().file) setAttachment(null); // 첨부는 1회 전송 후 해제 (가림본·빼기 선택 포함)
+    if (pipeline) return sendPipeline(body, att, opts, original);
+    const outcome = runBroadcast(body, targets, att, opts);
     if (!outcome) return setBusy(false);
     // 전송 단계 완료를 기다림 (completion은 응답 관찰까지)
     while (outcome.ms === 0 && Object.keys(outcome.sent).length === 0) await new Promise((r) => setTimeout(r, 50));
@@ -154,8 +174,68 @@ export function BroadcastBar() {
     setSummary((s) => `${s ?? ""} · ${saved !== "skipped" ? `비교 기록 ${saved === "saved" ? "저장" : "큐"}` : useSession.getState().ephemeral ? "기록 안 함" : "응답 수집 완료"}`);
   };
 
+  /**
+   * 전송 버튼: 비식별 관문 → 검토(필요 시) → dispatch.
+   * 탐지는 전부 로컬. 검토 모드는 후보가 있거나 첨부를 읽지 못할 때만 패널을 연다.
+   */
+  const send = async () => {
+    const original = text;
+    const body = text.trim();
+    if (!body || busy || !canSend) return;
+    setBusy(true);
+    setSummary(null);
+    const composed = composePrompt(promptPrefix, body);
+    if (piiMode === "off") return dispatch(composed, attachment, { composed: true }, original);
+    setSummary(attachment ? "개인정보 검사 중(첨부 포함)…" : "개인정보 검사 중…");
+    const prep = await preparePayload(composed, attachment, { always: piiAlways, never: piiNever }, attachment ? browserPdfLoader : undefined);
+    if (!needsReview(prep)) {
+      setSummary(null);
+      return dispatch(composed, attachment, { composed: true, pii: { mapping: [], meta: passthroughMeta(prep) } }, original);
+    }
+    if (piiMode === "auto" && !attachmentUnreadable(prep)) {
+      const f = finalizePayload(prep, prep.groups, "masked");
+      setSummary(`${f.meta.count}개 가림`);
+      return dispatch(f.text, f.attachment, { composed: true, pii: { mapping: f.mapping, meta: f.meta } }, original);
+    }
+    setReview({ prep, groups: prep.groups, choice: defaultAttachmentChoice(prep) });
+    setSummary(null);
+    setBusy(false);
+  };
+
+  const confirmReview = () => {
+    if (!review) return;
+    const f = finalizePayload(review.prep, review.groups, review.choice);
+    setReview(null);
+    setBusy(true);
+    if (f.meta.count) setSummary(`${f.meta.count}개 가림`);
+    void dispatch(f.text, f.attachment, { composed: true, pii: { mapping: f.mapping, meta: f.meta } }, text);
+  };
+  const sendOriginalFromReview = () => {
+    if (!review) return;
+    const p = review.prep;
+    setReview(null);
+    setBusy(true);
+    void dispatch(p.prompt, p.attachment, { composed: true, pii: { mapping: [], meta: passthroughMeta(p) } }, text);
+  };
+  const selectedText = () => {
+    const ta = taRef.current;
+    return ta ? ta.value.slice(ta.selectionStart, ta.selectionEnd) : "";
+  };
+  const PII_MODE_LABEL: Record<PiiMode, string> = { off: "비식별화 끔", review: "비식별화 검토", auto: "비식별화 자동" };
+  const nextPiiMode: Record<PiiMode, PiiMode> = { review: "auto", auto: "off", off: "review" };
+
   return (
     <div className="flex shrink-0 flex-col border-t border-white/10">
+      {review && (
+        <PiiReview
+          state={review}
+          onChange={setReview}
+          onConfirm={confirmReview}
+          onSendOriginal={sendOriginalFromReview}
+          onCancel={() => setReview(null)}
+          getSelectedText={selectedText}
+        />
+      )}
       {(prefixOpen || promptPrefix.trim()) && (
         <div className="flex items-start gap-2 px-3 pt-2 text-xs">
           <span className="mt-1.5 shrink-0 text-white/50" title="동시 전송과 파이프라인 생성 단계의 프롬프트 앞에 붙습니다. 검증·수정 프롬프트에는 붙지 않고, 워크스테이션에 저장됩니다">접두어</span>
@@ -196,6 +276,23 @@ export function BroadcastBar() {
         }
       >
         {ephemeral ? "🔒" : "🔓"}
+      </button>
+      <button
+        onClick={() => setPiiMode(nextPiiMode[piiMode])}
+        disabled={busy || !!review}
+        title={
+          piiMode === "off"
+            ? "비식별화 꺼짐: 프롬프트·첨부를 검사하지 않고 보냅니다. 클릭하면 검토 모드"
+            : piiMode === "review"
+              ? "비식별화 검토: 보내기 전에 개인정보·기관명을 찾아 보여 주고 가릴지 정합니다. 클릭하면 자동 모드"
+              : "비식별화 자동: 찾은 항목을 모두 가리고 보냅니다(첨부를 못 읽으면 물어봄). 클릭하면 끔"
+        }
+        className={
+          "h-12 shrink-0 rounded-lg border px-2.5 text-xs " +
+          (piiMode === "off" ? "border-white/10 text-white/40 hover:bg-white/10" : piiMode === "auto" ? "border-amber-400/50 bg-amber-400/15 text-amber-200" : "border-amber-400/30 text-amber-200/80 hover:bg-amber-400/10")
+        }
+      >
+        {PII_MODE_LABEL[piiMode]}
       </button>
       <button
         onClick={() => fileRef.current?.click()}
@@ -279,6 +376,7 @@ export function BroadcastBar() {
           }
         }}
         rows={2}
+        readOnly={!!review}
         placeholder={placeholder}
         className="min-h-12 flex-1 resize-y rounded-lg border border-white/10 bg-white/5 px-3.5 py-2.5 text-base text-white/90 outline-none placeholder:text-white/30 focus:border-white/30"
       />
@@ -317,6 +415,12 @@ export function BroadcastBar() {
             >
               저장
             </button>
+            {!!lastBroadcast.pii?.length && (
+              <label className="flex items-center gap-1 text-xs text-white/50" title="가렸던 값을 이 기기에서만 원래대로 되돌려 복사·저장합니다">
+                <input type="checkbox" checked={restoreExport} onChange={(e) => setRestoreExport(e.target.checked)} />
+                원문 복원
+              </label>
+            )}
           </span>
         )}
         {summary && <span className="text-xs text-white/50">{summary}</span>}

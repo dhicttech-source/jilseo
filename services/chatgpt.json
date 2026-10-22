@@ -4,12 +4,12 @@
   "url": "https://chatgpt.com",
   "partition": "persist:chatgpt",
   "selectors": {
-    "input": "#prompt-textarea",
-    "send": "button[data-testid=\"send-button\"]",
-    "response": "[data-message-author-role=\"assistant\"]",
+    "input": "#prompt-textarea, form div.ProseMirror[contenteditable=\"true\"]",
+    "send": "button[data-testid=\"send-button\"], button[aria-label=\"보내기\"], button[aria-label=\"Send prompt\"]",
+    "response": "[data-message-author-role=\"assistant\"], [data-chatgpt-selection-message-id]",
     "fileInput": "input#upload-files",
-    "generating": "button[data-testid=\"stop-button\"]"
+    "generating": "TODO(selector)"
   },
-  "verified": "2026-09-10 라이브 DOM 실측 완료: input·send·fileInput·response(첫 Broadcast 응답 719자 수집 확인) / 파일 첨부 대화방에서는 이후 응답이 생성되지 않아(무료 플랜) afterFileBroadcast=new_chat",
+  "verified": "2026-10-22 UI 개편 실측: 입력 form 안 ProseMirror(aria \"ChatGPT에게 물어보세요\"; 답변 안 메일 초안 블록도 ProseMirror라 form으로 구분), 전송 aria \"보내기\", 답변 [data-chatgpt-selection-message-id](data-message-author-role 제거됨). 생성 중 표시는 개편 후 미실측(TODO)",
   "afterFileBroadcast": "new_chat"
 }

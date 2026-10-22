@@ -7,6 +7,7 @@ import { DEFAULT_VERIFY_TEMPLATE } from "../lib/verifyPrompt";
 import { COMPOSITE_LENS_ID, type Lens } from "../lib/lenses";
 import { applyPreset, findPreset, type Depth } from "../lib/presets";
 import { validateServices } from "../lib/serviceSchema";
+import type { PiiMode } from "../lib/pii/prepare";
 
 export type PanelPhase =
   | "creating"
@@ -70,6 +71,12 @@ interface Settings {
   usageLimits?: Record<string, number>;
   /** 동시 전송·파이프라인 생성 단계 프롬프트 앞에 붙는 접두어 (워크스테이션별 개인화) */
   promptPrefix?: string;
+  /** 전송 전 비식별화: 끔 / 검토(기본) / 자동 */
+  piiMode?: PiiMode;
+  /** 항상 가릴 단어 */
+  piiAlways?: string[];
+  /** 가리지 않을 단어 */
+  piiNever?: string[];
 }
 
 export const UI_SCALES = [1, 1.15, 1.3, 1.5] as const;
@@ -147,8 +154,15 @@ interface StageState {
   presetId: string | null;
   usageLimits: Record<string, number>;
   promptPrefix: string;
+  piiMode: PiiMode;
+  piiAlways: string[];
+  piiNever: string[];
 
   init(): Promise<void>;
+  setPiiMode(mode: PiiMode): void;
+  setPiiWords(list: "always" | "never", words: string[]): void;
+  /** 단어 하나를 허용 목록(가리지 않음)에 추가 — 검토 패널의 "항상 허용" */
+  allowPiiWord(word: string): void;
   setUsageLimit(serviceId: string, limit: number): void;
   setPromptPrefix(prefix: string): void;
   setDepth(depth: Depth): void;
@@ -191,7 +205,7 @@ function persist(get: () => StageState) {
   saveTimer = setTimeout(() => {
     const {
       stage, columns, maximized, supabase, device, onboarded, webSlots, newChatAfterFile, uiScale, mode, roles,
-      lensAssign, lensOverrides, customLenses, depth, presetId, usageLimits, promptPrefix,
+      lensAssign, lensOverrides, customLenses, depth, presetId, usageLimits, promptPrefix, piiMode, piiAlways, piiNever,
     } = get();
     const settings: Settings = {
       version: 1,
@@ -213,6 +227,9 @@ function persist(get: () => StageState) {
       presetId,
       usageLimits,
       promptPrefix,
+      piiMode,
+      piiAlways,
+      piiNever,
     };
     invoke("write_settings", { settings }).catch(() => {});
   }, 200);
@@ -244,6 +261,9 @@ export const useStage = create<StageState>((set, get) => ({
   presetId: null,
   usageLimits: {},
   promptPrefix: "",
+  piiMode: "review",
+  piiAlways: [],
+  piiNever: [],
 
   async init() {
     const [svcRes, settings, dir, inset] = await Promise.all([
@@ -287,6 +307,9 @@ export const useStage = create<StageState>((set, get) => ({
       presetId: settings?.presetId ?? null,
       usageLimits: settings?.usageLimits ?? {},
       promptPrefix: settings?.promptPrefix ?? "",
+      piiMode: settings?.piiMode ?? "review",
+      piiAlways: settings?.piiAlways ?? [],
+      piiNever: settings?.piiNever ?? [],
     });
     applyUiScale(settings?.uiScale ?? DEFAULT_UI_SCALE);
   },
@@ -326,6 +349,24 @@ export const useStage = create<StageState>((set, get) => ({
 
   setPromptPrefix(prefix) {
     set({ promptPrefix: prefix });
+    persist(get);
+  },
+
+  setPiiMode(mode) {
+    set({ piiMode: mode });
+    persist(get);
+  },
+
+  setPiiWords(list, words) {
+    const clean = [...new Set(words.map((w) => w.trim()).filter((w) => w.length >= 2))];
+    set(list === "always" ? { piiAlways: clean } : { piiNever: clean });
+    persist(get);
+  },
+
+  allowPiiWord(word) {
+    const w = word.trim();
+    if (!w || get().piiNever.includes(w)) return;
+    set((s) => ({ piiNever: [...s.piiNever, w], piiAlways: s.piiAlways.filter((x) => x !== w) }));
     persist(get);
   },
 

@@ -6,6 +6,9 @@ import { DEFAULT_REVISE_TEMPLATE, REVISE_TEMPLATE_KEY, buildRevisePrompt, revise
 import { resolvePipelineRoles } from "./roles";
 import { PIPELINE_META_KEY, type PipelineMeta } from "./scorecard";
 import { composePrompt } from "./promptVars";
+import type { SendOptions } from "./broadcast";
+import type { MaskEntry } from "./pii/mask";
+import type { PiiMeta } from "./pii/prepare";
 import { saveRow, updateOrQueue } from "./supabase";
 import { verifyKey } from "./verifyPrompt";
 import { useAttachment } from "../store/attachment";
@@ -42,6 +45,9 @@ export interface PipelineResult {
   skipped: string[];
   /** 임시 전송으로 실행되어 클라우드에 저장하지 않음 */
   ephemeral: boolean;
+  /** 전송 전 가림 대응표 (메모리에만, 복원 표시용) */
+  pii?: MaskEntry[];
+  piiMeta?: PiiMeta;
   /** 수정 단계 결과 (심층 깊이 자동, 그 외 카드 버튼). 없으면 미실행 */
   revised?: string;
   reviseError?: string;
@@ -59,12 +65,13 @@ export function buildResponsesRow(
   answer: string,
   verifiers: VerifierResult[],
   revised?: string,
-  meta?: { presetId: string | null; depth: Depth },
+  meta?: { presetId: string | null; depth: Depth; pii?: PiiMeta },
 ) {
   const responses: Record<string, unknown> = { [generatorId]: answer };
   if (revised?.trim()) responses[revisedKey(generatorId)] = revised;
   if (meta) {
     const m: PipelineMeta = {
+      ...(meta.pii ? { pii: meta.pii } : {}),
       presetId: meta.presetId,
       depth: meta.depth,
       generator: generatorId,
@@ -93,9 +100,12 @@ export async function runPipeline(
   text: string,
   onProgress: (step: PipelineStep, detail: string) => void = () => {},
   attachment: Attachment | null = useAttachment.getState().file,
+  opts: SendOptions = {},
 ): Promise<PipelineResult> {
   const { stage, roles, services, device, depth, presetId, promptPrefix } = useStage.getState();
-  const body = composePrompt(promptPrefix, text); // 접두어는 생성 단계에만 (검증·수정 프롬프트에는 붙이지 않음)
+  // 접두어는 생성 단계에만 (검증·수정 프롬프트에는 붙이지 않음). 비식별 관문을 거쳤으면 이미 합쳐져 있다
+  const body = opts.composed ? text.trim() : composePrompt(promptPrefix, text);
+  const piiMeta = opts.pii?.meta;
   if (!body) throw new Error("보낼 내용이 없습니다");
   const resolved = resolvePipelineRoles(stage, roles, services);
   if (resolved.error || !resolved.generator) throw new Error(resolved.error ?? "생성 패널이 없습니다");
@@ -141,7 +151,7 @@ export async function runPipeline(
     saved = await saveRow(cloud.config(), cloud.user, "comparisons", {
       id: rowId,
       prompt: body,
-      responses: buildResponsesRow(gen.id, answer, verifiers, undefined, { presetId, depth }),
+      responses: buildResponsesRow(gen.id, answer, verifiers, undefined, { presetId, depth, pii: piiMeta }),
       device,
     });
     void cloud.flush();
@@ -164,6 +174,8 @@ export async function runPipeline(
     presetId,
     skipped,
     ephemeral,
+    pii: opts.pii?.mapping,
+    piiMeta,
   };
   // 심층 깊이: 판정을 생성 패널에 되돌려 수정본까지 받는다 (전송 +1, 고정 순서)
   const final = depth === "deep" && verifiersSent > 0 ? await runRevise(result, onProgress) : result;
@@ -200,7 +212,7 @@ export async function runRevise(result: PipelineResult, onProgress: (step: Pipel
   if (result.saved !== "skipped") {
     const cloud = useCloud.getState();
     await updateOrQueue(cloud.config(), "comparisons", result.rowId, {
-      responses: buildResponsesRow(result.generator, result.answer, result.verifiers, revised, { presetId: result.presetId, depth: result.depth }),
+      responses: buildResponsesRow(result.generator, result.answer, result.verifiers, revised, { presetId: result.presetId, depth: result.depth, pii: result.piiMeta }),
     });
     void cloud.flush();
   }

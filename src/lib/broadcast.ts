@@ -15,6 +15,16 @@ import { useSession } from "../store/session";
 import { useStage } from "../store/stage";
 import { useUsage } from "../store/usage";
 import { composePrompt } from "./promptVars";
+import type { MaskEntry } from "./pii/mask";
+import type { PiiMeta } from "./pii/prepare";
+
+/** 전송 옵션: composed=접두어까지 이미 합쳐진 텍스트(비식별 관문을 거친 경우), pii=가림 대응표·메타 */
+export interface SendOptions {
+  composed?: boolean;
+  pii?: { mapping: MaskEntry[]; meta: PiiMeta };
+}
+/** 비식별 메타를 기록용 responses에 붙이는 키 (원문 없음) */
+export const PII_META_KEY = "_pii";
 
 export type SentResults = Record<string, { ok: boolean; detail?: string }>;
 
@@ -73,9 +83,11 @@ export function runBroadcast(
   text: string,
   targets?: ServiceDef[],
   attachment: Attachment | null = useAttachment.getState().file,
+  opts: SendOptions = {},
 ): BroadcastOutcome | null {
   const { services, stage, device, promptPrefix } = useStage.getState();
-  const body = composePrompt(promptPrefix, text); // 워크스테이션 접두어 (기록에는 실제 전송 텍스트를 남긴다)
+  // 워크스테이션 접두어 (기록에는 실제 전송 텍스트를 남긴다). 비식별 관문을 거쳤으면 이미 합쳐져 있다
+  const body = opts.composed ? text.trim() : composePrompt(promptPrefix, text);
   const defs = (
     targets ?? stage.map((id) => services.find((s) => s.id === id)).filter((s): s is ServiceDef => !!s)
   ).filter(isBroadcastTarget);
@@ -96,12 +108,13 @@ export function runBroadcast(
     const okDefs = defs.filter((d) => sent[d.id]?.ok);
     if (okDefs.length === 0) return { responses: {}, saved: "skipped" as const };
     const { ephemeral, setLastBroadcast } = useSession.getState();
-    setLastBroadcast({ prompt: body, responses, at: Date.now(), ephemeral });
+    setLastBroadcast({ prompt: body, responses, at: Date.now(), ephemeral, pii: opts.pii?.mapping });
     // 임시 전송이면 클라우드에 남기지 않는다
     let saved: "saved" | "queued" | "skipped" = "skipped";
     if (!ephemeral) {
       const cloud = useCloud.getState();
-      saved = await saveRow(cloud.config(), cloud.user, "comparisons", { prompt: body, responses, device });
+      const row = opts.pii ? { ...responses, [PII_META_KEY]: opts.pii.meta } : responses;
+      saved = await saveRow(cloud.config(), cloud.user, "comparisons", { prompt: body, responses: row, device });
       void cloud.flush();
     }
     if (attachment) moveToNewChatAfterFile(okDefs);

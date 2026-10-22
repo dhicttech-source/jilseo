@@ -4,11 +4,12 @@
  * import.meta.env.DEV 에서만 시작되므로 dmg(프로덕션)에는 동작하지 않는다.
  *
  * dev_commands.json: { "id": "c1", "type": "broadcast", "text": "..." }
- * types: status | broadcast | pipeline | last_pipeline | revise | scorecard | ui_eval | set_ephemeral | export | usage | set_prefix | set_mode | set_role | set_lens | apply_preset | set_depth | judge | diagnose | memo | apply_stage | set_columns
+ * types: status | broadcast | pipeline | last_pipeline | revise | scorecard | ui_eval | set_ephemeral | export | usage | set_prefix
+ *        | pii_detect | pii_send | set_mode | set_role | set_lens | apply_preset | set_depth | judge | diagnose | memo | apply_stage | set_columns
  *        | maximize | select_in_panel | eval | attach | add_web_slot | remove_web_slot
  */
 import { readStore, writeStore } from "./store";
-import { runBroadcastAndWaitSent } from "./broadcast";
+import { runBroadcast, runBroadcastAndWaitSent } from "./broadcast";
 import { runPipeline } from "./pipeline";
 import { resolvePipelineRoles, type PanelRole, type SendMode } from "./roles";
 import type { Judged } from "./lenses";
@@ -18,6 +19,10 @@ import { probeRecords } from "./devProbe";
 import { useScorecard } from "../store/scorecard";
 import { useSession } from "../store/session";
 import { useUsage } from "../store/usage";
+import { finalizePayload, preparePayload } from "./pii/prepare";
+import { browserPdfLoader } from "./pii/pdfLoader";
+import { base64ToBytes, decodeText } from "./pii/extract";
+import { composePrompt } from "./promptVars";
 import { pipelineToMarkdown } from "./exportMarkdown";
 import { saveExport } from "./exportFile";
 import { depthOf } from "./presets";
@@ -135,6 +140,26 @@ async function execute(cmd: Command): Promise<unknown> {
       });
       const path = await saveExport(md, "pipeline", r.at);
       return { path, length: md.length, head: md.slice(0, 300) };
+    }
+    case "pii_detect":
+    case "pii_send": {
+      // 비식별 관문 검증용: 첨부 경로(선택)를 읽어 탐지 → (pii_send면) 모두 가려 동시 전송
+      const att = cmd.path ? await invoke<Attachment>("read_file_base64", { path: String(cmd.path) }) : null;
+      const composed = composePrompt(stage.promptPrefix, String(cmd.text ?? ""));
+      const prep = await preparePayload(composed, att, { always: stage.piiAlways, never: stage.piiNever }, att ? browserPdfLoader : undefined);
+      const f = finalizePayload(prep, prep.groups, (cmd.choice as "masked" | "original" | "remove") ?? "masked");
+      const summary = {
+        groups: prep.groups.map((g) => ({ kind: g.kind, original: g.original, token: g.token, counts: g.counts, confidence: g.confidence })),
+        extracted: prep.extracted && { kind: prep.extracted.kind, converted: prep.extracted.converted, note: prep.extracted.note, length: prep.extracted.text?.length ?? null },
+        maskedText: f.text,
+        attachment: f.attachment && { name: f.attachment.name, mime: f.attachment.mime, size: f.attachment.size, head: decodeText(base64ToBytes(f.attachment.data)).slice(0, 600) },
+        meta: f.meta,
+      };
+      if (cmd.type === "pii_detect") return summary;
+      const o = runBroadcast(f.text, undefined, f.attachment, { composed: true, pii: { mapping: f.mapping, meta: f.meta } });
+      if (!o) return { ...summary, error: "nothing to send" };
+      const done = await o.completion;
+      return { ...summary, sent: o.sent, responses: Object.fromEntries(Object.entries(done.responses).map(([k, v]) => [k, String(v).slice(0, 500)])), saved: done.saved };
     }
     case "usage":
       return { today: useUsage.getState().today, limits: stage.usageLimits, log: useUsage.getState().log };

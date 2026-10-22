@@ -12,6 +12,8 @@ export interface PipelineMeta {
   generator: string;
   verifiers: { id: string; lens: string }[];
   revised?: boolean;
+  /** 전송 전 비식별화 메타 (원문 없음: 개수·종류·첨부 처리) */
+  pii?: { count: number; kinds: string[]; attachment: string };
 }
 
 export interface ComparisonRow {

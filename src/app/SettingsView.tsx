@@ -30,6 +30,13 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
   const uiScale = useStage((s) => s.uiScale);
   const setUiScale = useStage((s) => s.setUiScale);
   const setNewChatAfterFile = useStage((s) => s.setNewChatAfterFile);
+  const piiMode = useStage((s) => s.piiMode);
+  const setPiiMode = useStage((s) => s.setPiiMode);
+  const piiAlways = useStage((s) => s.piiAlways);
+  const piiNever = useStage((s) => s.piiNever);
+  const setPiiWords = useStage((s) => s.setPiiWords);
+  const [alwaysText, setAlwaysText] = useState(piiAlways.join("\n"));
+  const [neverText, setNeverText] = useState(piiNever.join("\n"));
   const baseServices = useStage((s) => s.baseServices);
   const usageLimits = useStage((s) => s.usageLimits);
   const setUsageLimit = useStage((s) => s.setUsageLimit);
@@ -186,6 +193,49 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
               </span>
             </span>
           </label>
+        </section>
+
+        <section className="flex flex-col gap-3 rounded-lg border border-white/10 p-4">
+          <h2 className="text-sm font-medium text-white/85">비식별화 (전송 전 개인정보·기관명 가리기)</h2>
+          <p className="text-xs text-white/40">
+            보내기 직전에 프롬프트와 첨부 문서에서 주민·전화·이메일·카드·계좌·주소·이름·기관명 등을 이 기기 안에서 찾아(외부 전송 없음) 기호로 바꿉니다.
+            같은 대상은 프롬프트와 문서 전체에서 같은 기호(예: [인물A])가 되고, 원래 값은 이 기기 메모리에만 남아 요약 카드·내보내기에서 되돌려 볼 수 있습니다.
+            docx·pptx·xlsx·PDF는 텍스트로 변환해 보내며(서식·이미지 제외), 이미지와 스캔 PDF는 검사할 수 없어 원본/첨부 빼기 중에서 고르게 합니다.
+          </p>
+          <div className="flex gap-2">
+            {(["review", "auto", "off"] as const).map((m) => (
+              <button
+                key={m}
+                onClick={() => setPiiMode(m)}
+                className={"rounded px-3 py-1 text-xs " + (piiMode === m ? "bg-white/20 text-white/90" : "bg-white/5 text-white/50")}
+              >
+                {m === "review" ? "검토 (기본)" : m === "auto" ? "자동" : "끔"}
+              </button>
+            ))}
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <Field label="항상 가릴 단어 (한 줄에 하나, 2글자 이상) — 회사명·고객사·프로젝트명 등">
+              <textarea
+                value={alwaysText}
+                onChange={(e) => setAlwaysText(e.target.value)}
+                onBlur={() => setPiiWords("always", alwaysText.split("\n"))}
+                rows={5}
+                className={input + " resize-y"}
+              />
+            </Field>
+            <Field label="가리지 않을 단어 — 공공기관·공개 인물 등 (검토 패널의 &quot;항상 허용&quot;도 여기에 쌓임)">
+              <textarea
+                value={neverText}
+                onChange={(e) => setNeverText(e.target.value)}
+                onBlur={() => setPiiWords("never", neverText.split("\n"))}
+                rows={5}
+                className={input + " resize-y"}
+              />
+            </Field>
+          </div>
+          <p className="text-xs text-white/35">
+            규칙 기반 탐지라 호칭 없는 이름·외국인 이름·약어로 쓴 기관명은 놓칠 수 있습니다. 검토 패널에서 직접 추가하거나 "항상 가릴 단어"에 넣어 두세요. 서비스에 로그인한 계정 자체의 신원은 가릴 수 없습니다.
+          </p>
         </section>
 
         <section className="flex flex-col gap-3 rounded-lg border border-white/10 p-4">

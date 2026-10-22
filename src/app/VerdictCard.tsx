@@ -2,6 +2,7 @@ import { GRADE_LABEL, type Grade, type Judged } from "../lib/lenses";
 import { depthOf, findPreset, sortByLensOrder } from "../lib/presets";
 import { pipelineToMarkdown } from "../lib/exportMarkdown";
 import { copyText, saveExport } from "../lib/exportFile";
+import { restore } from "../lib/pii/mask";
 import { useState } from "react";
 import { usePipelineResult } from "../store/pipelineResult";
 import { useStage } from "../store/stage";
@@ -33,10 +34,14 @@ export function VerdictCard() {
   const setMaximized = useStage((s) => s.setMaximized);
   const maximized = useStage((s) => s.maximized);
   const [note, setNote] = useState<string | null>(null);
+  const [showOriginal, setShowOriginal] = useState(false);
   if (!result) return null;
+  const mapping = result.pii ?? [];
+  /** 가렸던 값을 이 기기에서만 원래대로 (카드 표시·내보내기) */
+  const un = (t: string) => (showOriginal && mapping.length ? restore(t, mapping) : t);
   const name = (id: string) => services.find((x) => x.id === id)?.name ?? id;
   const toMarkdown = () =>
-    pipelineToMarkdown({
+    un(pipelineToMarkdown({
       prompt: result.prompt,
       generatorName: name(result.generator),
       answer: result.answer,
@@ -46,7 +51,7 @@ export function VerdictCard() {
       depthLabel: depthOf(result.depth).label,
       at: result.at,
       ephemeral: result.ephemeral,
-    });
+    }));
   const flash = (m: string) => {
     setNote(m);
     setTimeout(() => setNote(null), 3000);
@@ -66,6 +71,12 @@ export function VerdictCard() {
           {result.skipped.length > 0 && ` · 생략 ${result.skipped.map(name).join(", ")}`}
         </span>
         {note && <span className="text-xs text-sky-300">{note}</span>}
+        {mapping.length > 0 && (
+          <label className="flex items-center gap-1 text-xs text-amber-200/80" title="전송 전에 가린 값(기호)을 이 기기에서만 원래 값으로 보여 줍니다. 서비스 패널 화면은 가린 상태 그대로입니다">
+            <input type="checkbox" checked={showOriginal} onChange={(e) => setShowOriginal(e.target.checked)} />
+            원래 이름으로 보기 ({mapping.length})
+          </label>
+        )}
         <button
           onClick={() => void copyText(toMarkdown()).then((ok) => flash(ok ? "Markdown 복사됨" : "복사 실패"))}
           className="ml-auto rounded px-2 py-0.5 text-white/60 hover:bg-white/10 hover:text-white/90"
@@ -122,7 +133,7 @@ export function VerdictCard() {
               <ul className="list-disc pl-4 text-xs text-white/75">
                 {v.verdict.headline.map((h, i) => (
                   <li key={i} className="truncate" title={h}>
-                    {h}
+                    {un(h)}
                   </li>
                 ))}
               </ul>
@@ -155,7 +166,7 @@ export function VerdictCard() {
             {result.reviseError && <span className="text-rose-300">{result.reviseError}</span>}
             {result.revised && <span className="text-white/40">{result.revised.length.toLocaleString()}자 · 전문은 생성 패널에서</span>}
           </div>
-          {result.revised && <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs text-white/75">{result.revised.slice(0, 600)}</p>}
+          {result.revised && <p className="mt-1 line-clamp-3 whitespace-pre-line text-xs text-white/75">{un(result.revised.slice(0, 600))}</p>}
         </div>
       )}
     </div>

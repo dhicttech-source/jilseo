@@ -45,7 +45,7 @@ export const usePipelineResult = create<PipelineResultState>((set, get) => ({
     if (r.saved === "skipped") return "skipped"; // 임시 전송·미저장 기록은 로컬에만 반영
     const cloud = useCloud.getState();
     const res = await updateOrQueue(cloud.config(), "comparisons", r.rowId, {
-      responses: buildResponsesRow(r.generator, r.answer, verifiers, r.revised, { presetId: r.presetId, depth: r.depth }),
+      responses: buildResponsesRow(r.generator, r.answer, verifiers, r.revised, { presetId: r.presetId, depth: r.depth, pii: r.piiMeta }),
     });
     void cloud.flush();
     return res;

@@ -1,4 +1,5 @@
 import { create } from "zustand";
+import type { MaskEntry } from "../lib/pii/mask";
 
 /**
  * 앱 세션 동안만 유지되는 상태 (설정에 저장하지 않음).
@@ -10,6 +11,8 @@ export interface LastBroadcast {
   responses: Record<string, string>;
   at: number;
   ephemeral: boolean;
+  /** 전송 전 가림 대응표 (이 기기 메모리에만, 복원 표시용) */
+  pii?: MaskEntry[];
 }
 
 interface SessionState {
