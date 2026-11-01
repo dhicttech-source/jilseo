@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { findPreset } from "./presets";
-import { aggregate, extractVerdictRecords, recommend, type ComparisonRow } from "./scorecard";
+import { aggregate, aggregateRatings, extractVerdictRecords, recommend, rowKind, serviceKeys, type ComparisonRow } from "./scorecard";
 
 const verdict = (lens: string, grade: string, severe = 0, judged?: string, parsed = true) => ({
   lens, grade, counts: { severe, normal: 0, minor: 0 }, headline: [], parsed, judged,
@@ -103,5 +103,44 @@ describe("recommend", () => {
 
   it("표본 하한을 올리면 기록 부족", () => {
     expect(recommend(card, report, ["claude", "gemini", "perplexity"], 5).every((r) => r.model === null)).toBe(true);
+  });
+});
+
+describe("rowKind / serviceKeys", () => {
+  it("판정·메타·검증 키가 있으면 파이프라인, 아니면 동시 전송", () => {
+    expect(rowKind(rows[0])).toBe("pipeline");
+    expect(rowKind(row("x", { claude: "a", "verify:gemini": "b" }))).toBe("pipeline");
+    expect(rowKind(rows[3])).toBe("broadcast");
+    expect(rowKind(row("y", { claude: "a", _pii: { count: 1 }, _rating: { best: "claude", fail: [] } }))).toBe("broadcast");
+  });
+  it("서비스 키는 메타·검증·수정 키를 뺀다", () => {
+    expect(serviceKeys(rows[1].responses)).toEqual(["claude"]);
+    expect(serviceKeys({ a: "1", _pii: {}, _rating: {} })).toEqual(["a"]);
+  });
+});
+
+describe("aggregateRatings", () => {
+  const b = [
+    row("b1", { chatgpt: "a", claude: "b", gemini: "c", _rating: { best: "claude", fail: ["chatgpt"] } }),
+    row("b2", { chatgpt: "a", claude: "b", _rating: { best: "chatgpt", fail: [] } }),
+    row("b3", { chatgpt: "a", claude: "b" }), // 미평가
+    ...rows.slice(0, 1), // 파이프라인 기록은 무시
+  ];
+  const c = aggregateRatings(b);
+
+  it("동시 전송 기록 수와 평가된 기록 수", () => {
+    expect(c.rows).toBe(3);
+    expect(c.rated).toBe(2);
+  });
+
+  it("서비스별 응답 수·★·✕와 비율 (분모는 평가된 기록)", () => {
+    expect(c.byService.chatgpt).toEqual({ runs: 3, rated: 2, best: 1, fail: 1, bestRate: 0.5, failRate: 0.5 });
+    expect(c.byService.claude).toMatchObject({ runs: 3, rated: 2, best: 1, bestRate: 0.5, failRate: 0 });
+    expect(c.byService.gemini).toMatchObject({ runs: 1, rated: 1, best: 0, bestRate: 0 });
+  });
+
+  it("aggregate에 함께 실린다", () => {
+    expect(aggregate(b).broadcast.rows).toBe(3);
+    expect(aggregate([]).broadcast).toEqual({ rows: 0, rated: 0, byService: {} });
   });
 });

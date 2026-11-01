@@ -1,5 +1,6 @@
 import { GRADE_LABEL, type Grade, type Judged } from "../lib/lenses";
 import { depthOf, findPreset, sortByLensOrder } from "../lib/presets";
+import { commonPoints, gradeDistribution } from "../lib/consensus";
 import { pipelineToMarkdown } from "../lib/exportMarkdown";
 import { copyText, saveExport } from "../lib/exportFile";
 import { restore } from "../lib/pii/mask";
@@ -7,14 +8,14 @@ import { useState } from "react";
 import { usePipelineResult } from "../store/pipelineResult";
 import { useStage } from "../store/stage";
 
-const GRADE_CLASS: Record<Grade, string> = {
+export const GRADE_CLASS: Record<Grade, string> = {
   trust: "bg-emerald-400/20 text-emerald-200",
   revise: "bg-amber-400/20 text-amber-200",
   distrust: "bg-rose-400/20 text-rose-200",
   unknown: "bg-white/10 text-white/50",
 };
 
-const JUDGE: { key: Judged; label: string; on: string }[] = [
+export const JUDGE: { key: Judged; label: string; on: string }[] = [
   { key: "right", label: "맞는 지적", on: "bg-emerald-400/30 text-emerald-100" },
   { key: "wrong", label: "틀린 지적", on: "bg-rose-400/30 text-rose-100" },
   { key: "hold", label: "보류", on: "bg-white/25 text-white/90" },
@@ -59,6 +60,9 @@ export function VerdictCard() {
   // 표시 순서: 긍정 → 사실 → 추론 → 부정 → 개선 (설계 §4). 패널 자체는 옮기지 않는다
   const ordered = sortByLensOrder(result.verifiers, (v) => v.lens.id);
   const preset = findPreset(result.presetId ?? undefined);
+  // 합의 요약 (설계 §10): 등급 분포와 검증자 둘 이상이 짚은 공통 지적
+  const dist = gradeDistribution(result.verifiers.map((v) => ({ grade: v.verdict.grade, sent: v.sent })));
+  const common = commonPoints(ordered.filter((v) => v.sent).map((v) => ({ serviceId: v.serviceId, headline: v.verdict.headline })));
 
   return (
     <div className="flex shrink-0 flex-col gap-2 border-t border-white/10 bg-white/[0.03] px-3 py-2 text-sm">
@@ -112,6 +116,25 @@ export function VerdictCard() {
           ✕
         </button>
       </div>
+      {(dist || common.length > 0) && (
+        <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-xs">
+          {dist && (
+            <span className="text-white/70" title="검증자들의 등급 분포 (전송 실패 제외)">
+              등급 {dist}
+            </span>
+          )}
+          {common.length > 0 && (
+            <span className="min-w-0 text-white/60" title="서로 다른 검증자 둘 이상이 비슷하게 쓴 핵심 지적">
+              <span className="text-sky-200/90">공통 지적</span>{" "}
+              {common.slice(0, 3).map((c, i) => (
+                <span key={i} className="mr-2">
+                  {un(c.text)} <span className="text-white/35">({c.by.map(name).join("·")})</span>
+                </span>
+              ))}
+            </span>
+          )}
+        </div>
+      )}
       <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${Math.max(1, ordered.length)}, minmax(0, 1fr))` }}>
         {ordered.map((v) => (
           <div key={v.serviceId} className="flex min-w-0 flex-col gap-1 rounded-lg border border-white/10 p-2">
@@ -127,6 +150,11 @@ export function VerdictCard() {
             {v.sent && v.verdict.parsed && (
               <div className="text-xs text-white/45">
                 심각 {v.verdict.counts.severe} · 보통 {v.verdict.counts.normal} · 경미 {v.verdict.counts.minor}
+              </div>
+            )}
+            {v.sent && v.verdict.confirmed && (
+              <div className="truncate text-xs text-emerald-200/80" title={un(v.verdict.confirmed)}>
+                확인됨: {un(v.verdict.confirmed)}
               </div>
             )}
             {v.verdict.headline.length > 0 ? (

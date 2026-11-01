@@ -1,4 +1,6 @@
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { useStage } from "../store/stage";
+import { GUIDE_URL } from "./Help";
 
 /** 첫 실행 안내. 스테이지 대신 표시되므로 webview와 겹치지 않는다. */
 export function Onboarding({ onSettings }: { onSettings: () => void }) {
@@ -36,6 +38,14 @@ export function Onboarding({ onSettings }: { onSettings: () => void }) {
             프롬프트·메모·비교 기록을 두 맥 간 공유하려면 <b className="text-white/90">설정</b>에서 Supabase를 연결하세요. 없어도 로컬로 동작합니다.
           </li>
         </ol>
+        <p className="text-sm text-white/55">
+          처음이라면 <b className="text-white/80">동시 전송 → 응답 평가(★/✕) → 생성→검증</b> 순서로 한 번씩 써 보세요. 헤더의 <b className="text-white/80">도움말</b>에서 화면별
+          안내를,{" "}
+          <button onClick={() => void openUrl(GUIDE_URL).catch(() => {})} className="text-sky-300 underline-offset-2 hover:underline">
+            사용 설명서
+          </button>
+          에서 단계별 설명을 볼 수 있습니다.
+        </p>
         <div className="flex gap-2">
           <button onClick={() => setOnboarded(true)} className="rounded-lg bg-white/90 px-4 py-2 text-sm font-medium text-black hover:bg-white">
             시작하기

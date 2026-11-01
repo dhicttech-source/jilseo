@@ -4,7 +4,7 @@
  * import.meta.env.DEV 에서만 시작되므로 dmg(프로덕션)에는 동작하지 않는다.
  *
  * dev_commands.json: { "id": "c1", "type": "broadcast", "text": "..." }
- * types: status | broadcast | pipeline | last_pipeline | revise | scorecard | ui_eval | set_ephemeral | export | usage | set_prefix
+ * types: status | broadcast | pipeline | last_pipeline | revise | scorecard | records | seed_records | seed_card | rate | ui_eval | set_ephemeral | export | usage | set_prefix
  *        | pii_detect | pii_send | set_mode | set_role | set_lens | apply_preset | set_depth | judge | diagnose | memo | apply_stage | set_columns
  *        | maximize | select_in_panel | eval | attach | add_web_slot | remove_web_slot
  */
@@ -12,7 +12,7 @@ import { readStore, writeStore } from "./store";
 import { runBroadcast, runBroadcastAndWaitSent } from "./broadcast";
 import { runPipeline } from "./pipeline";
 import { resolvePipelineRoles, type PanelRole, type SendMode } from "./roles";
-import type { Judged } from "./lenses";
+import { parseVerdict, resolveLens, type Judged } from "./lenses";
 import type { Depth } from "./presets";
 import { usePipelineResult } from "../store/pipelineResult";
 import { probeRecords } from "./devProbe";
@@ -28,7 +28,8 @@ import { saveExport } from "./exportFile";
 import { depthOf } from "./presets";
 import { getClient, tableName } from "./supabase";
 import { findPreset } from "./presets";
-import { recommend } from "./scorecard";
+import { aggregate, recommend, type ComparisonRow } from "./scorecard";
+import { emptyFilter, matchesFilter, readRecord, summaryLine, type RecordFilter } from "./records";
 import { saveNoteFor } from "./notes";
 import { evalInPanel } from "./panels";
 import { runDiagnostics } from "./diagnostics";
@@ -94,6 +95,43 @@ async function execute(cmd: Command): Promise<unknown> {
       const preset = findPreset(String(cmd.presetId ?? ""));
       const rec = preset ? recommend(card, preset, stage.stage.filter((id) => stage.roles[id] !== "generate")) : null;
       return { ...card, recommend: rec };
+    }
+    case "records": {
+      // 성적표 기록 탭과 같은 조회·필터 (본문 제외 요약)
+      if (!useScorecard.getState().loadedAt || cmd.reload) await useScorecard.getState().load();
+      const f: RecordFilter = { ...emptyFilter(), ...((cmd.filter as Partial<RecordFilter>) ?? {}) };
+      const name = (id: string) => stage.services.find((x) => x.id === id)?.name ?? id;
+      const list = useScorecard.getState().rows.map(readRecord).filter((d) => matchesFilter(d, f));
+      return {
+        total: useScorecard.getState().rows.length,
+        matched: list.length,
+        broadcast: useScorecard.getState().card?.broadcast,
+        items: list.slice(0, Number(cmd.limit ?? 10)).map((d) => ({ id: d.id, at: d.at, kind: d.kind, prompt: d.prompt.slice(0, 40), summary: summaryLine(d, name), rating: d.rating })),
+      };
+    }
+    case "seed_records": {
+      // 화면 확인용: 가짜 행을 성적표 상태에만 넣는다 (네트워크 없음). 이 상태에서 평가·채택·삭제를 누르면 큐에 쌓이니 누르지 말 것
+      const rows = (cmd.rows as ComparisonRow[]) ?? [];
+      useScorecard.setState({ rows, card: aggregate(rows), loadedAt: Date.now(), message: null, hasMore: false, loading: false });
+      return { rows: rows.length };
+    }
+    case "seed_card": {
+      // 화면 확인용: 기록 행 하나로 판정 요약 카드를 다시 띄운다 (검증 원문을 현재 파서로 다시 읽음, 저장 안 함)
+      const d = readRecord(cmd.row as ComparisonRow);
+      if (d.kind !== "pipeline" || !d.generator) return { error: "pipeline row required" };
+      const verifiers = d.verifiers.map((v) => ({ serviceId: v.serviceId, lens: resolveLens(v.lens, stage.lensOverrides, stage.customLenses), text: v.text, verdict: parseVerdict(v.text, v.lens), sent: true }));
+      usePipelineResult.getState().set({
+        rowId: d.id, prompt: d.prompt, generator: d.generator, answer: d.answers[0]?.text ?? "", verifiers,
+        verifiersSent: verifiers.length, verifiersTotal: verifiers.length, saved: "skipped", ms: 0, at: Date.parse(d.at) || Date.now(),
+        depth: (d.depth ?? "standard") as Depth, presetId: d.presetId, skipped: [], ephemeral: false,
+      });
+      return { verdicts: verifiers.map((v) => ({ id: v.serviceId, grade: v.verdict.grade, confirmed: v.verdict.confirmed, headline: v.verdict.headline })) };
+    }
+    case "rate": {
+      // 마지막 동시 전송 평가: { kind: "best"|"fail", serviceId }
+      const res = await useSession.getState().rateLast(cmd.kind === "fail" ? "fail" : "best", String(cmd.serviceId));
+      const b = useSession.getState().lastBroadcast;
+      return { result: res, rowId: b?.rowId, saved: b?.saved, rating: b?.rating };
     }
     case "ui_eval":
       // UI webview 안에서 실행 (화면 전환 등 테스트용). 개발 빌드 전용

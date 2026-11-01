@@ -1,10 +1,13 @@
 import { VERDICTS_KEY, type Grade, type Judged, type Verdict } from "./lenses";
 import type { Preset } from "./presets";
+import { readRating, isRated } from "./rating";
 import { REVISED_KEY_PREFIX } from "./revise";
 import { VERIFY_KEY_PREFIX } from "./verifyPrompt";
 
 /** 비교 기록 responses jsonb 안의 파이프라인 메타 키 (스키마 변경 없이 저장) */
 export const PIPELINE_META_KEY = "_meta";
+/** 동시 전송 기록의 비식별 메타 키 (원문 없음: 개수·종류·첨부 처리) */
+export const PII_META_KEY = "_pii";
 
 export interface PipelineMeta {
   presetId: string | null;
@@ -21,7 +24,20 @@ export interface ComparisonRow {
   prompt?: string;
   responses: Record<string, unknown>;
   created_at?: string;
+  device?: string | null;
 }
+
+export type RowKind = "broadcast" | "pipeline";
+
+/** 기록 종류: 판정·파이프라인 메타·검증 키가 하나라도 있으면 파이프라인, 아니면 동시 전송 */
+export function rowKind(row: ComparisonRow): RowKind {
+  const r = row.responses ?? {};
+  return VERDICTS_KEY in r || PIPELINE_META_KEY in r || Object.keys(r).some((k) => k.startsWith(VERIFY_KEY_PREFIX)) ? "pipeline" : "broadcast";
+}
+
+/** 서비스 응답 키 (메타 `_`·검증·수정 접두어 제외). 동시 전송 기록이면 응답한 서비스 목록 */
+export const serviceKeys = (responses: Record<string, unknown>) =>
+  Object.keys(responses ?? {}).filter((k) => !k.startsWith("_") && !k.startsWith(VERIFY_KEY_PREFIX) && !k.startsWith(REVISED_KEY_PREFIX));
 
 /** 판정 1건 = (기록, 검증 모델, 렌즈) */
 export interface VerdictRecord {
@@ -38,12 +54,11 @@ export interface VerdictRecord {
   revised: boolean;
 }
 
-const isMetaKey = (k: string) => k.startsWith("_");
 const isVerdictsMap = (v: unknown): v is Record<string, Verdict> => !!v && typeof v === "object" && !Array.isArray(v);
 
 /** 메타가 없는 옛 기록: 생성 키는 verify:/revised:/_ 접두어가 아닌 유일한 키 */
-function inferGenerator(responses: Record<string, unknown>): string | null {
-  const keys = Object.keys(responses).filter((k) => !isMetaKey(k) && !k.startsWith(VERIFY_KEY_PREFIX) && !k.startsWith(REVISED_KEY_PREFIX));
+export function inferGenerator(responses: Record<string, unknown>): string | null {
+  const keys = serviceKeys(responses);
   return keys.length === 1 ? keys[0] : null;
 }
 
@@ -95,6 +110,23 @@ export interface GeneratorStat {
   trustRate: number | null;
   revised: number;
 }
+/** 동시 전송 평가 집계 (서비스별) */
+export interface RatingStat {
+  /** 응답한 동시 전송 기록 수 */
+  runs: number;
+  /** 그중 평가(★ 또는 ✕)가 있는 기록 수 */
+  rated: number;
+  best: number;
+  fail: number;
+  /** ★ 최고 ÷ 평가된 기록. 표본 없으면 null */
+  bestRate: number | null;
+  failRate: number | null;
+}
+export interface BroadcastCard {
+  rows: number;
+  rated: number;
+  byService: Record<string, RatingStat>;
+}
 export interface Scorecard {
   byLensModel: Record<string, Record<string, CellStat>>;
   byGenerator: Record<string, GeneratorStat>;
@@ -102,6 +134,8 @@ export interface Scorecard {
   rows: number;
   from: string | null;
   to: string | null;
+  /** 동시 전송 기록의 응답 평가 */
+  broadcast: BroadcastCard;
 }
 
 const emptyCell = (): CellStat => ({
@@ -150,7 +184,34 @@ export function aggregate(rows: ComparisonRow[]): Scorecard {
     g.trustRate = ratio(g.trustVotes, g.totalVotes);
   }
   const dates = records.map((r) => r.at).filter(Boolean).sort();
-  return { byLensModel, byGenerator, rows: rowIds.size, from: dates[0] ?? null, to: dates[dates.length - 1] ?? null };
+  return { byLensModel, byGenerator, rows: rowIds.size, from: dates[0] ?? null, to: dates[dates.length - 1] ?? null, broadcast: aggregateRatings(rows) };
+}
+
+/** 동시 전송 기록의 ★/✕ 평가를 서비스별로 센다. 평가 없는 기록은 응답 수(runs)에만 들어간다 */
+export function aggregateRatings(rows: ComparisonRow[]): BroadcastCard {
+  const byService: Record<string, RatingStat> = {};
+  let n = 0;
+  let rated = 0;
+  for (const row of rows) {
+    if (rowKind(row) !== "broadcast") continue;
+    n++;
+    const rating = readRating(row.responses);
+    const has = isRated(rating);
+    if (has) rated++;
+    for (const id of serviceKeys(row.responses)) {
+      const st = (byService[id] ??= { runs: 0, rated: 0, best: 0, fail: 0, bestRate: null, failRate: null });
+      st.runs++;
+      if (!has) continue;
+      st.rated++;
+      if (rating.best === id) st.best++;
+      if (rating.fail.includes(id)) st.fail++;
+    }
+  }
+  for (const st of Object.values(byService)) {
+    st.bestRate = ratio(st.best, st.rated);
+    st.failRate = ratio(st.fail, st.rated);
+  }
+  return { rows: n, rated, byService };
 }
 
 export interface Recommendation {

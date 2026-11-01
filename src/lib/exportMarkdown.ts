@@ -52,6 +52,7 @@ export function pipelineToMarkdown(e: PipelineExport): string {
       const c = v.verdict.counts;
       const judged = v.verdict.judged ? ` · 채택: ${JUDGED_LABEL[v.verdict.judged]}` : "";
       lines.push(`> 등급 **${GRADE_LABEL[v.verdict.grade]}** · 지적 심각 ${c.severe} / 보통 ${c.normal} / 경미 ${c.minor}${judged}`);
+      if (v.verdict.confirmed) lines.push(`> 확인됨: ${v.verdict.confirmed}`);
       for (const h of v.verdict.headline) lines.push(`> - ${h}`);
       lines.push("");
     }

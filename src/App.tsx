@@ -1,7 +1,9 @@
 import { useEffect, useState } from "react";
 import { revealItemInDir } from "@tauri-apps/plugin-opener";
 import { BroadcastBar } from "./app/BroadcastBar";
+import { BroadcastRating } from "./app/BroadcastRating";
 import { Dock } from "./app/Dock";
+import { Help, type HelpTopic } from "./app/Help";
 import { Onboarding } from "./app/Onboarding";
 import { PromptLibrary } from "./app/PromptLibrary";
 import { Scorecard } from "./app/Scorecard";
@@ -18,7 +20,7 @@ import { useUsage } from "./store/usage";
 import { runDiagnostics, summarize } from "./lib/diagnostics";
 import { startDevHarness } from "./lib/devHarness";
 
-type View = "stage" | "settings" | "scorecard";
+type View = "stage" | "settings" | "scorecard" | "help";
 
 export default function App() {
   const loaded = useStage((s) => s.loaded);
@@ -33,6 +35,8 @@ export default function App() {
   const cloudStatus = useCloud((s) => s.status);
   const queued = useCloud((s) => s.queued);
   const [view, setView] = useState<View>("stage");
+  /** 도움말을 연 화면 (그 화면 항목을 먼저 보여 주고, 돌아가기로 복귀) */
+  const [helpFrom, setHelpFrom] = useState<HelpTopic>("stage");
   const [diag, setDiag] = useState<string | null>(null);
 
   const diagnose = async () => {
@@ -94,7 +98,7 @@ export default function App() {
         </button>
         <button
           className={"rounded px-2.5 py-1 hover:bg-white/10 " + (view === "scorecard" ? "bg-white/15 text-white/90" : "text-white/55 hover:text-white/90")}
-          title="렌즈×모델 맞는 지적 비율, 생성 모델 신뢰 비율 (파이프라인 기록 집계)"
+          title="집계: 렌즈×모델 맞는 지적 비율·생성 모델 신뢰 비율·동시 전송 평가 / 기록: 지난 비교 찾기·평가 수정"
           onClick={() => setView(view === "scorecard" ? "stage" : "scorecard")}
         >
           성적표
@@ -106,6 +110,17 @@ export default function App() {
         >
           설정{cloudStatus === "signed_in" ? " ●" : queued ? ` (${queued})` : ""}
         </button>
+        <button
+          className={"rounded px-2.5 py-1 hover:bg-white/10 " + (view === "help" ? "bg-white/15 text-white/90" : "text-white/55 hover:text-white/90")}
+          title="이 화면에서 할 수 있는 것 · 사용 설명서"
+          onClick={() => {
+            if (view === "help") return setView(helpFrom);
+            setHelpFrom(view);
+            setView("help");
+          }}
+        >
+          도움말
+        </button>
       </header>
 
       {!loaded ? (
@@ -116,6 +131,8 @@ export default function App() {
         <SettingsView onClose={() => setView("stage")} />
       ) : view === "scorecard" ? (
         <Scorecard onClose={() => setView("stage")} />
+      ) : view === "help" ? (
+        <Help from={helpFrom} onClose={() => setView(helpFrom)} />
       ) : (
         <Stage />
       )}
@@ -125,6 +142,7 @@ export default function App() {
           {libraryOpen && <PromptLibrary />}
           <Dock />
           <VerdictCard />
+          <BroadcastRating />
           <BroadcastBar />
         </>
       )}

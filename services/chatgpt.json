@@ -8,8 +8,8 @@
     "send": "button[data-testid=\"send-button\"], button[aria-label=\"보내기\"], button[aria-label=\"Send prompt\"]",
     "response": "[data-message-author-role=\"assistant\"], [data-chatgpt-selection-message-id]",
     "fileInput": "input#upload-files",
-    "generating": "TODO(selector)"
+    "generating": "button[aria-label=\"중지\"], button[data-testid=\"stop-button\"]"
   },
-  "verified": "2026-10-22 UI 개편 실측: 입력 form 안 ProseMirror(aria \"ChatGPT에게 물어보세요\"; 답변 안 메일 초안 블록도 ProseMirror라 form으로 구분), 전송 aria \"보내기\", 답변 [data-chatgpt-selection-message-id](data-message-author-role 제거됨). 생성 중 표시는 개편 후 미실측(TODO)",
+  "verified": "2026-10-22 UI 개편 실측: 입력 form 안 ProseMirror(aria \"ChatGPT에게 물어보세요\"; 답변 안 메일 초안 블록도 ProseMirror라 form으로 구분), 전송 aria \"보내기\", 답변 [data-chatgpt-selection-message-id](data-message-author-role 제거됨). 생성 중 표시는 개편 후 미실측(TODO) / 2026-11-02 생성 중 표시 실측(1회): 전송 직후 있던 aria \"중지\" 버튼이 답변 완료 2.1초에 사라짐 (devProbe vanished)",
   "afterFileBroadcast": "new_chat"
 }

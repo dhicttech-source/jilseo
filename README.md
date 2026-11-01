@@ -2,9 +2,10 @@
 
 여러 AI 웹 서비스(ChatGPT · Claude · Gemini · Grok · Perplexity)를 한 창의 패널로 띄우고, 프롬프트 하나를 동시에 보내거나 **생성 → 검증 파이프라인**으로 돌리는 개인용 macOS/Windows 데스크톱 앱입니다. API를 쓰지 않고 각 서비스의 웹 화면에 직접 입력합니다(계정·로그인은 서비스 웹뷰가 관리).
 
-> **English**: jilseo is a personal desktop app (Tauri 2) that opens several AI web services side by side, broadcasts one prompt to all of them, or runs a *generate → verify* pipeline: one service answers, the others critique it through "verification lenses" (fact, logic, risk, …), and a scorecard tracks which service catches real issues. No API keys: it types into each service's own web UI, so your existing subscriptions apply. Downloads are on the [Releases](https://github.com/dhicttech-source/jilseo/releases) page; see [CONTRIBUTING.md](CONTRIBUTING.md) to help.
+> **English**: jilseo is a personal desktop app (Tauri 2) that opens several AI web services side by side, broadcasts one prompt to all of them, or runs a *generate → verify* pipeline: one service answers, the others critique it through "verification lenses" (fact, logic, risk, …), and a scorecard tracks which service catches real issues. No API keys: it types into each service's own web UI, so your existing subscriptions apply. Downloads are on the [Releases](https://github.com/dhicttech-source/jilseo/releases) page; a step-by-step [user guide](docs/USER-GUIDE.md) (Korean) walks through first use; see [CONTRIBUTING.md](CONTRIBUTING.md) to help.
 
 **다운로드**: [Releases](https://github.com/dhicttech-source/jilseo/releases) — macOS(Apple Silicon) dmg, Windows x64 설치 파일.
+**처음 쓰신다면**: [사용 설명서](docs/USER-GUIDE.md) — 설치·로그인부터 동시 전송, 생성→검증, 성적표까지 순서대로.
 
 ## 할 수 있는 것
 
@@ -12,7 +13,8 @@
 - **생성 → 검증 파이프라인**: 한 서비스가 답을 만들면 나머지가 검증. 패널마다 역할(생성/검증/제외)과 **검증 렌즈**(사실·논리·위험·강점·개선·코드·편향·종합)를 배정
 - **검토 프리셋·깊이**: 보고서 / 기획 / 코드 / 빠른 검토 / 결론 검토 프리셋, 빠름·표준·심층 깊이
 - **판정 요약 카드**: 등급·지적 건수·핵심 줄을 먼저 보고, 맞는 지적/틀린 지적을 채택. 심층에서는 지적을 반영한 **수정본**까지 자동 수신
-- **성적표**: 렌즈×서비스의 맞는 지적 비율, 생성 서비스 신뢰 비율. 기록이 쌓이면 배정을 제안(자동 라우팅 없음)
+- **성적표·기록**: 렌즈×서비스의 맞는 지적 비율, 생성 서비스 신뢰 비율, 동시 전송 응답 평가(★ 최고·✕ 실패). 기록 탭에서 지난 비교를 검색·다시 읽고 평가를 고침. 기록이 쌓이면 배정을 제안(자동 라우팅 없음)
+- **합의 요약**: 검증자들의 등급 분포, 둘 이상이 같이 짚은 공통 지적, 동의할 때의 근거("확인됨")
 - **프롬프트 변수·접두어·전송 카운터**: 라이브러리의 `{{변수}}`를 삽입 시 채움, 워크스테이션별 프롬프트 접두어, 서비스별 오늘 전송 횟수와 한도 경고
 - **전송 전 비식별화**: 프롬프트와 첨부 문서(txt·docx·pptx·xlsx·PDF)에서 개인정보·기관명을 이 기기 안에서 찾아, 검토 후 `[인물A]` 같은 기호로 바꿔 보냄. 원래 값은 이 기기에만 남고 결과 화면에서 되돌려 볼 수 있음
 - **내보내기·임시 전송**: 비교 기록을 Markdown으로 복사·저장(Obsidian 등으로), 민감한 프롬프트는 🔒 임시 전송으로 기록을 남기지 않음
@@ -47,6 +49,7 @@ Rust(rustup)와 Xcode Command Line Tools가 필요합니다. 서비스별 DOM �
 
 ## 문서
 
+- 사용 설명서: [`docs/USER-GUIDE.md`](docs/USER-GUIDE.md)
 - 원본 지시문: `docs/JILSEO-DIRECTIVE.md` · 개발 계획과 진행 상태: `docs/PLAN.md`
 - 변경 기록: `docs/CHANGELOG.md`
 - 검증 렌즈 설계: `docs/verification-lens-design-2026-09-30.md`

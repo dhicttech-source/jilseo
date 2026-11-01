@@ -3,6 +3,8 @@ import type { Judged } from "../lib/lenses";
 import { buildResponsesRow, runRevise, type PipelineResult } from "../lib/pipeline";
 import { updateOrQueue } from "../lib/supabase";
 import { useCloud } from "./cloud";
+import { useScorecard } from "./scorecard";
+import { useStage } from "./stage";
 
 /** 마지막 파이프라인 결과와 사람의 채택. 요약 카드(VerdictCard)가 읽는다. */
 interface PipelineResultState {
@@ -44,9 +46,10 @@ export const usePipelineResult = create<PipelineResultState>((set, get) => ({
     set({ result: next });
     if (r.saved === "skipped") return "skipped"; // 임시 전송·미저장 기록은 로컬에만 반영
     const cloud = useCloud.getState();
-    const res = await updateOrQueue(cloud.config(), "comparisons", r.rowId, {
-      responses: buildResponsesRow(r.generator, r.answer, verifiers, r.revised, { presetId: r.presetId, depth: r.depth, pii: r.piiMeta }),
-    });
+    const responses = buildResponsesRow(r.generator, r.answer, verifiers, r.revised, { presetId: r.presetId, depth: r.depth, pii: r.piiMeta });
+    // 성적표를 열어 둔 상태면 집계에 바로 반영
+    useScorecard.getState().patchRow(r.rowId, responses, { prompt: r.prompt, created_at: new Date(r.at).toISOString(), device: useStage.getState().device });
+    const res = await updateOrQueue(cloud.config(), "comparisons", r.rowId, { responses });
     void cloud.flush();
     return res;
   },

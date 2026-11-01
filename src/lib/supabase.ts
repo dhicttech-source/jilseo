@@ -136,7 +136,10 @@ export async function deleteOrQueue(cfg: SupabaseConfig | null, table: QueueTabl
   return "queued";
 }
 
-/** 부분 갱신 시도 → 실패면 큐 (insert가 큐에 남아 있어도 순서대로 재시도되므로 나중에 적용된다) */
+/**
+ * 부분 갱신 시도 → 실패면 큐 (insert가 큐에 남아 있어도 순서대로 재시도되므로 나중에 적용된다).
+ * 바뀐 행이 0개면(아직 큐에 있는 insert, 미로그인으로 RLS에 가려짐) 오류가 없어도 큐에 넣는다 — 평가·채택 유실 방지.
+ */
 export async function updateOrQueue(
   cfg: SupabaseConfig | null,
   table: QueueTable,
@@ -145,8 +148,8 @@ export async function updateOrQueue(
 ): Promise<"saved" | "queued"> {
   const c = getClient(cfg);
   if (c) {
-    const { error } = await c.from(tableName(table)).update(patch).eq("id", id);
-    if (!error) return "saved";
+    const { data, error } = await c.from(tableName(table)).update(patch).eq("id", id).select("id");
+    if (!error && (data?.length ?? 0) > 0) return "saved";
   }
   await enqueue({ table, op: "update", row: { id, ...patch } });
   return "queued";
@@ -160,9 +163,19 @@ export async function flushQueue(cfg: SupabaseConfig | null): Promise<number> {
   const { data } = await c.auth.getSession();
   if (!data.session) return q.length;
   const remaining: QueueItem[] = [];
+  // insert가 아직 실패 중인 행의 update·delete는 보내지 않고 남긴다 (0행 갱신이 성공으로 지워지는 것 방지)
+  const pendingInsert = new Set<string>();
   for (const item of q) {
+    const rowId = String(item.row.id ?? "");
+    if (item.op !== "insert" && rowId && pendingInsert.has(rowId)) {
+      remaining.push(item);
+      continue;
+    }
     const res = await replay(c, item);
-    if (res.error) remaining.push(item);
+    if (res.error) {
+      remaining.push(item);
+      if (item.op === "insert" && rowId) pendingInsert.add(rowId);
+    }
   }
   await writeStore("queue", remaining);
   return remaining.length;

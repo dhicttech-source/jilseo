@@ -15,6 +15,7 @@ import { useSession } from "../store/session";
 import { useStage } from "../store/stage";
 import { useUsage } from "../store/usage";
 import { composePrompt } from "./promptVars";
+import { PII_META_KEY } from "./scorecard";
 import type { MaskEntry } from "./pii/mask";
 import type { PiiMeta } from "./pii/prepare";
 
@@ -23,8 +24,7 @@ export interface SendOptions {
   composed?: boolean;
   pii?: { mapping: MaskEntry[]; meta: PiiMeta };
 }
-/** 비식별 메타를 기록용 responses에 붙이는 키 (원문 없음) */
-export const PII_META_KEY = "_pii";
+export { PII_META_KEY };
 
 export type SentResults = Record<string, { ok: boolean; detail?: string }>;
 
@@ -108,15 +108,17 @@ export function runBroadcast(
     const okDefs = defs.filter((d) => sent[d.id]?.ok);
     if (okDefs.length === 0) return { responses: {}, saved: "skipped" as const };
     const { ephemeral, setLastBroadcast } = useSession.getState();
-    setLastBroadcast({ prompt: body, responses, at: Date.now(), ephemeral, pii: opts.pii?.mapping });
+    // 행 id를 미리 정해 두어 평가(★/✕)가 같은 행을 갱신할 수 있게 한다
+    const rowId = crypto.randomUUID();
+    const row = opts.pii ? { ...responses, [PII_META_KEY]: opts.pii.meta } : responses;
     // 임시 전송이면 클라우드에 남기지 않는다
     let saved: "saved" | "queued" | "skipped" = "skipped";
     if (!ephemeral) {
       const cloud = useCloud.getState();
-      const row = opts.pii ? { ...responses, [PII_META_KEY]: opts.pii.meta } : responses;
-      saved = await saveRow(cloud.config(), cloud.user, "comparisons", { prompt: body, responses: row, device });
+      saved = await saveRow(cloud.config(), cloud.user, "comparisons", { id: rowId, prompt: body, responses: row, device });
       void cloud.flush();
     }
+    setLastBroadcast({ prompt: body, responses, at: Date.now(), ephemeral, pii: opts.pii?.mapping, rowId, saved, row });
     if (attachment) moveToNewChatAfterFile(okDefs);
     return { responses, saved };
   });

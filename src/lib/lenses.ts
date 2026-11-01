@@ -22,6 +22,7 @@ export const VERDICT_BLOCK = `마지막에 반드시 아래 형식을 그대로 
 ${VERDICT_MARK}
 등급: 신뢰 가능 / 일부 수정 필요 / 신뢰 불가 중 하나만
 지적: 심각 N / 보통 N / 경미 N
+확인: (맞다고 확인한 핵심 주장과 그 근거 한 줄, 없으면 "없음")
 핵심:
 - (가장 중요한 지적 한 줄)
 - (둘째 줄, 없으면 생략)
@@ -197,6 +198,8 @@ export interface Verdict {
   grade: Grade;
   counts: { severe: number; normal: number; minor: number };
   headline: string[];
+  /** 검증자가 맞다고 확인한 주장과 근거 (동의의 근거). 없거나 옛 기록이면 빈 문자열/undefined */
+  confirmed?: string;
   /** 판정 블록을 읽어냈는지 */
   parsed: boolean;
   /** 사람의 채택 (맞는 지적 / 틀린 지적 / 보류) */
@@ -222,6 +225,14 @@ const num = (s: string, label: string) => {
   return m ? Number(m[1]) : 0;
 };
 
+/** "확인:" 줄. 자리표시자를 그대로 돌려줬거나 "없음"이면 빈 문자열 */
+function confirmedOf(tail: string): string {
+  // 서비스가 줄바꿈을 빼고 "확인: 없음 핵심: …"처럼 이어 쓰면 다음 항목 이름에서 자른다
+  const line = (/확인\s*[:：]\s*([^\n]*)/.exec(tail)?.[1] ?? "").split(/\s*(?:핵심|등급|지적)\s*[:：]/)[0].trim();
+  if (!line || /^\(.*\)$/.test(line) || /^(없음|없습니다|해당\s*없음|-|none)\.?$/i.test(line)) return "";
+  return line;
+}
+
 /**
  * 판정 블록 파싱. "=== 판정 ===" 뒤를 우선 읽고, 없으면 본문 끝 부분에서 "등급:"을 찾는다.
  * 관대하게 읽되, 등급을 못 찾으면 parsed=false / grade=unknown.
@@ -241,10 +252,12 @@ export function parseVerdict(markdown: string, lens: string): Verdict {
     for (const raw of after.split("\n")) {
       const line = raw.replace(/^\s*(?:[-•·]|\d+[.)])\s*/, "").trim();
       if (!line) continue;
+      if (/^(?:확인|등급|지적)\s*[:：]/.test(line)) break; // 핵심 뒤에 다른 항목을 쓴 경우
       if (/^\(.*\)$/.test(line)) continue; // 템플릿의 자리표시자를 그대로 돌려준 경우
+      if (/(?:까요|할까|드릴게요)\s*\??$/.test(line)) continue; // 판정 뒤에 붙는 후속 제안 ("더 분석해 볼까요?")
       headline.push(line);
       if (headline.length >= 3) break;
     }
   }
-  return { lens, grade, counts, headline, parsed: grade !== "unknown" };
+  return { lens, grade, counts, headline, confirmed: confirmedOf(tail), parsed: grade !== "unknown" };
 }

@@ -111,6 +111,30 @@ describe("parseVerdict", () => {
   it("빈 문자열도 안전", () => {
     expect(parseVerdict("", "fact").parsed).toBe(false);
   });
+
+  it("확인 줄: 동의의 근거를 읽고, 핵심 줄에 섞이지 않는다", () => {
+    const v = parseVerdict(`=== 판정 ===\n등급: 신뢰 가능\n지적: 심각 0 / 보통 0 / 경미 1\n확인: 2024년 통계청 수치와 일치\n핵심:\n- 단위 표기 누락`, "fact");
+    expect(v.confirmed).toBe("2024년 통계청 수치와 일치");
+    expect(v.headline).toEqual(["단위 표기 누락"]);
+  });
+
+  it("확인 줄을 핵심 뒤에 써도 핵심에 들어가지 않는다", () => {
+    const v = parseVerdict(`=== 판정 ===\n등급: 일부 수정 필요\n핵심:\n- 첫째\n확인: 계산식은 맞음`, "logic");
+    expect(v.headline).toEqual(["첫째"]);
+    expect(v.confirmed).toBe("계산식은 맞음");
+  });
+
+  it("확인 줄과 핵심을 한 줄에 이어 쓴 경우 (Gemini 실측), 후속 제안 줄은 핵심에서 뺀다", () => {
+    const v = parseVerdict(`=== 판정 ===\n등급: 신뢰 가능\n지적: 심각 0 / 보통 1 / 경미 1\n확인: 없음 핵심:\n- 예외 상황이 생략됨\n- 커피의 유형에 따라 어떻게 달라지는지 더 분석해 볼까요?`, "logic");
+    expect(v.confirmed).toBe("");
+    expect(v.headline).toEqual(["예외 상황이 생략됨"]);
+  });
+
+  it("확인 줄이 없거나, 없음·자리표시자면 빈 문자열", () => {
+    expect(parseVerdict(`=== 판정 ===\n등급: 신뢰 가능\n핵심:\n- a`, "fact").confirmed).toBe("");
+    expect(parseVerdict(`=== 판정 ===\n등급: 신뢰 가능\n확인: 없음\n핵심:\n- a`, "fact").confirmed).toBe("");
+    expect(parseVerdict(`=== 판정 ===\n등급: 신뢰 가능\n확인: (맞다고 확인한 핵심 주장과 그 근거 한 줄, 없으면 "없음")`, "fact").confirmed).toBe("");
+  });
 });
 
 describe("buildLensPrompt 길이 지시", () => {
