@@ -1,5 +1,6 @@
 import { create } from "zustand";
 import { aggregate, type ComparisonRow, type Scorecard } from "../lib/scorecard";
+import { cloudErrorMessage } from "../lib/cloudError";
 import { deleteOrQueue, getClient, tableName, updateOrQueue } from "../lib/supabase";
 import { useCloud } from "./cloud";
 
@@ -45,9 +46,9 @@ export const useScorecard = create<ScorecardState>((set, get) => ({
       return null;
     }
     set({ loading: true, message: null });
-    const { data, error } = await c.from(tableName("comparisons")).select(COLUMNS).order("created_at", { ascending: false }).range(0, PAGE - 1);
+    const { data, error, status } = await c.from(tableName("comparisons")).select(COLUMNS).order("created_at", { ascending: false }).range(0, PAGE - 1);
     if (error) {
-      set({ loading: false, message: `조회 실패: ${error.message}` });
+      set({ loading: false, message: cloudErrorMessage({ message: error.message, status }, "조회 실패") });
       return null;
     }
     const rows = (data ?? []) as ComparisonRow[];
@@ -61,13 +62,13 @@ export const useScorecard = create<ScorecardState>((set, get) => ({
     const cur = get().rows;
     if (!c || get().loading) return;
     set({ loading: true });
-    const { data, error } = await c
+    const { data, error, status } = await c
       .from(tableName("comparisons"))
       .select(COLUMNS)
       .order("created_at", { ascending: false })
       .range(cur.length, cur.length + PAGE - 1);
     if (error) {
-      set({ loading: false, message: `조회 실패: ${error.message}` });
+      set({ loading: false, message: cloudErrorMessage({ message: error.message, status }, "조회 실패") });
       return;
     }
     const more = (data ?? []) as ComparisonRow[];

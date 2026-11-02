@@ -1,0 +1,37 @@
+name: supabase-keepalive
+
+# Supabase 무료 프로젝트는 7일 동안 요청이 없으면 일시 중지된다. 두 기기를 다 안 쓰는 주에도 깨어 있도록
+# 3일마다 기록 테이블에 가벼운 읽기 요청을 1번 보낸다 (RLS 때문에 빈 목록이 오지만 DB 쿼리는 실행된다).
+# 실패하면 GitHub가 실패 메일을 보내므로 일시 중지 경보로도 쓴다.
+# 필요한 저장소 Secrets: SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY (없으면 건너뜀)
+# 참고: 공개 저장소에 60일 동안 커밋이 없으면 GitHub가 예약 실행을 멈춘다.
+
+on:
+  schedule:
+    - cron: "17 3 */3 * *"
+  workflow_dispatch:
+
+permissions: {}
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_KEY" ]; then
+            echo "SUPABASE_URL / SUPABASE_PUBLISHABLE_KEY Secrets가 없어 건너뜀"
+            exit 0
+          fi
+          code=$(curl -sS -o /dev/null -w '%{http_code}' --retry 3 --retry-delay 20 --max-time 30 \
+            -H "apikey: $SUPABASE_KEY" \
+            "${SUPABASE_URL%/}/rest/v1/jilseo_comparisons?select=id&limit=1")
+          echo "HTTP $code"
+          if [ "$code" != "200" ]; then
+            echo "::error::Supabase 응답 $code — 프로젝트가 일시 중지됐을 수 있습니다. 대시보드에서 Restore 하세요"
+            exit 1
+          fi
