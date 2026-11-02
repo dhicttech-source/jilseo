@@ -9,10 +9,10 @@ import { composePrompt } from "./promptVars";
 import type { SendOptions } from "./broadcast";
 import type { MaskEntry } from "./pii/mask";
 import type { PiiMeta } from "./pii/prepare";
-import { saveRow, updateOrQueue } from "./supabase";
+import { saveComparison, updateComparison } from "./comparisons";
+import type { SaveState } from "./localRecords";
 import { verifyKey } from "./verifyPrompt";
 import { useAttachment } from "../store/attachment";
-import { useCloud } from "../store/cloud";
 import { useSession } from "../store/session";
 import { useStage } from "../store/stage";
 
@@ -36,7 +36,7 @@ export interface PipelineResult {
   verifiers: VerifierResult[];
   verifiersSent: number;
   verifiersTotal: number;
-  saved: "saved" | "queued" | "skipped";
+  saved: SaveState;
   ms: number;
   at: number;
   depth: Depth;
@@ -145,16 +145,14 @@ export async function runPipeline(
 
   const rowId = crypto.randomUUID();
   const ephemeral = useSession.getState().ephemeral;
-  let saved: "saved" | "queued" | "skipped" = "skipped";
+  let saved: SaveState = "skipped";
   if (!ephemeral) {
-    const cloud = useCloud.getState();
-    saved = await saveRow(cloud.config(), cloud.user, "comparisons", {
+    saved = await saveComparison({
       id: rowId,
       prompt: body,
       responses: buildResponsesRow(gen.id, answer, verifiers, undefined, { presetId, depth, pii: piiMeta }),
       device,
     });
-    void cloud.flush();
   }
   if (attachment) moveToNewChatAfterFile([gen]);
 
@@ -210,11 +208,10 @@ export async function runRevise(result: PipelineResult, onProgress: (step: Pipel
   if (!revised.trim()) return { ...result, reviseError: `${gen.name} 수정본을 받지 못했습니다` };
   const next: PipelineResult = { ...result, revised, reviseError: undefined };
   if (result.saved !== "skipped") {
-    const cloud = useCloud.getState();
-    await updateOrQueue(cloud.config(), "comparisons", result.rowId, {
-      responses: buildResponsesRow(result.generator, result.answer, result.verifiers, revised, { presetId: result.presetId, depth: result.depth, pii: result.piiMeta }),
-    });
-    void cloud.flush();
+    await updateComparison(
+      result.rowId,
+      buildResponsesRow(result.generator, result.answer, result.verifiers, revised, { presetId: result.presetId, depth: result.depth, pii: result.piiMeta }),
+    );
   }
   return next;
 }

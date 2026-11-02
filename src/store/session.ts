@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import type { MaskEntry } from "../lib/pii/mask";
 import { emptyRating, readRating, toggleBest, toggleFail, withRating, type Rating } from "../lib/rating";
-import { updateOrQueue } from "../lib/supabase";
-import { useCloud } from "./cloud";
+import { updateComparison } from "../lib/comparisons";
+import { isSaved, type SaveResult, type SaveState } from "../lib/localRecords";
 import { useScorecard } from "./scorecard";
 import { useStage } from "./stage";
 
@@ -20,7 +20,7 @@ export interface LastBroadcast {
   pii?: MaskEntry[];
   /** 비교 기록 행 id와 저장 결과, 저장한 responses 원본(_pii 포함) — 평가 갱신용 */
   rowId?: string;
-  saved?: "saved" | "queued" | "skipped";
+  saved?: SaveState;
   row?: Record<string, unknown>;
   rating?: Rating;
 }
@@ -31,7 +31,7 @@ interface SessionState {
   setEphemeral(v: boolean): void;
   setLastBroadcast(b: LastBroadcast | null): void;
   /** 마지막 동시 전송 응답 평가: ★ 최고 / ✕ 실패 토글 → 같은 비교 기록 행 갱신 (실패 시 큐) */
-  rateLast(kind: "best" | "fail", serviceId: string): Promise<"saved" | "queued" | "skipped">;
+  rateLast(kind: "best" | "fail", serviceId: string): Promise<SaveResult | "skipped">;
 }
 
 export const useSession = create<SessionState>((set, get) => ({
@@ -42,16 +42,13 @@ export const useSession = create<SessionState>((set, get) => ({
 
   async rateLast(kind, serviceId) {
     const b = get().lastBroadcast;
-    if (!b || !b.rowId || !b.row || b.saved === "skipped" || b.saved === undefined) return "skipped";
+    if (!b || !b.rowId || !b.row || !isSaved(b.saved)) return "skipped";
     const cur = b.rating ?? readRating(b.row) ?? emptyRating();
     const rating = kind === "best" ? toggleBest(cur, serviceId) : toggleFail(cur, serviceId);
     const row = withRating(b.row, rating);
     set({ lastBroadcast: { ...b, rating, row } });
     // 성적표를 열어 둔 상태면 집계에 바로 반영 (조회 뒤에 보낸 기록이면 맨 앞에 추가)
     useScorecard.getState().patchRow(b.rowId, row, { prompt: b.prompt, created_at: new Date(b.at).toISOString(), device: useStage.getState().device });
-    const cloud = useCloud.getState();
-    const res = await updateOrQueue(cloud.config(), "comparisons", b.rowId, { responses: row });
-    void cloud.flush();
-    return res;
+    return updateComparison(b.rowId, row);
   },
 }));

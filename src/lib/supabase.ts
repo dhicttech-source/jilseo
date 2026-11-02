@@ -87,6 +87,41 @@ export async function queueLength(): Promise<number> {
   return (await readQueue()).length;
 }
 
+/**
+ * 한 테이블의 대기열 항목 (보낸 순서). 기록 파일을 처음 만들 때 대기열에만 있던 기록을 옮겨 오는 데 쓴다.
+ * id 없이 쌓인 옛 insert에는 대기열 항목 id(uuid)를 행 id로 붙여 저장한다 — 이 기기 기록과 서버 행이 같은 id가 되어 두 번 올라가지 않게
+ */
+export async function queuedItems(table: QueueTable): Promise<{ op: "insert" | "update" | "delete"; row: Record<string, unknown> }[]> {
+  const q = await readQueue();
+  let changed = false;
+  for (const it of q) {
+    if (it.table === table && it.op === "insert" && !it.row.id) {
+      it.row = { ...it.row, id: it.id };
+      changed = true;
+    }
+  }
+  if (changed) await writeStore("queue", q);
+  return q.filter((it) => it.table === table).map(({ op, row }) => ({ op, row }));
+}
+
+/** 대기열에 남은 기록 id: insert·update(아직 서버에 없거나 서버가 옛 내용)와 delete를 나눠 돌려준다 */
+export async function queuedIds(table: QueueTable): Promise<{ writes: Set<string>; deletes: Set<string> }> {
+  const writes = new Set<string>();
+  const deletes = new Set<string>();
+  for (const it of await readQueue()) {
+    if (it.table !== table || !it.row.id) continue;
+    (it.op === "delete" ? deletes : writes).add(String(it.row.id));
+  }
+  return { writes, deletes };
+}
+
+/** 대기열에서 한 테이블의 항목을 모두 뺀다 (모든 기록 지우기). 반환: 남은 개수 */
+export async function dropQueued(table: QueueTable): Promise<number> {
+  const rest = (await readQueue()).filter((it) => it.table !== table);
+  await writeStore("queue", rest);
+  return rest.length;
+}
+
 async function enqueue(item: Omit<QueueItem, "id" | "at">) {
   const q = await readQueue();
   q.push({ ...item, id: crypto.randomUUID(), at: Date.now() });

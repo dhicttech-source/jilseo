@@ -5,7 +5,7 @@
 > **English**: jilseo is a personal desktop app (Tauri 2) that opens several AI web services side by side, broadcasts one prompt to all of them, or runs a *generate → verify* pipeline: one service answers, the others critique it through "verification lenses" (fact, logic, risk, …), and a scorecard tracks which service catches real issues. No API keys: it types into each service's own web UI, so your existing subscriptions apply. Downloads are on the [Releases](https://github.com/dhicttech-source/jilseo/releases) page; a step-by-step [user guide](docs/USER-GUIDE.md) (Korean) walks through first use; see [CONTRIBUTING.md](CONTRIBUTING.md) to help.
 
 **다운로드**: [Releases](https://github.com/dhicttech-source/jilseo/releases) — macOS(Apple Silicon) dmg, Windows x64 설치 파일.
-**처음 쓰신다면**: [사용 설명서](docs/USER-GUIDE.md) — 설치·로그인부터 동시 전송, 생성→검증, 성적표까지 순서대로.
+**처음 쓰신다면**: [사용 설명서](docs/USER-GUIDE.md) — 설치·로그인부터 동시 전송, 생성→검증, 성적표까지 순서대로. 평가·성적표는 설정 없이 이 기기에 저장되어 바로 쓸 수 있고, 두 기기에서 함께 쓸 때만 개인 Supabase(무료 가능)를 연결합니다.
 
 ## 할 수 있는 것
 

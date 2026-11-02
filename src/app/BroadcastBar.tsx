@@ -30,6 +30,7 @@ import { useUsage } from "../store/usage";
 import { overLimit } from "../lib/usage";
 import { broadcastToMarkdown } from "../lib/exportMarkdown";
 import { copyText, saveExport } from "../lib/exportFile";
+import { saveLabel } from "../lib/localRecords";
 import { useStage } from "../store/stage";
 
 const lensLabel = (id: string) => BUILTIN_LENSES.find((l) => l.id === id)?.name ?? id;
@@ -171,7 +172,7 @@ export function BroadcastBar() {
     if (outcome.okCount > 0) setText("");
     taRef.current?.focus();
     const { saved } = await outcome.completion;
-    setSummary((s) => `${s ?? ""} · ${saved !== "skipped" ? `비교 기록 ${saved === "saved" ? "저장" : "큐"}` : useSession.getState().ephemeral ? "기록 안 함" : "응답 수집 완료"}`);
+    setSummary((s) => `${s ?? ""} · ${saved !== "skipped" ? `비교 기록 ${saveLabel(saved)}` : useSession.getState().ephemeral ? "기록 안 함" : "응답 수집 완료"}`);
   };
 
   /**

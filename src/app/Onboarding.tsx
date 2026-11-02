@@ -35,7 +35,8 @@ export function Onboarding({ onSettings }: { onSettings: () => void }) {
             (파일이 붙은 대화방에서는 이후 답변이 생성되지 않는 경우가 있어서). 설정에서 끌 수 있습니다.
           </li>
           <li>
-            프롬프트·메모·비교 기록을 두 맥 간 공유하려면 <b className="text-white/90">설정</b>에서 Supabase를 연결하세요. 없어도 로컬로 동작합니다.
+            비교 기록·평가·성적표는 <b className="text-white/90">이 기기에 바로 저장</b>되어 설정 없이 쓸 수 있습니다(저장 위치는 설정 맨 위). 두 기기에서 함께 쓰거나 백업하려면{" "}
+            <b className="text-white/90">설정</b>에서 Supabase(무료 가능)를 연결하세요.
           </li>
         </ol>
         <p className="text-sm text-white/55">
@@ -57,7 +58,7 @@ export function Onboarding({ onSettings }: { onSettings: () => void }) {
             }}
             className="rounded-lg bg-white/10 px-4 py-2 text-sm text-white/80 hover:bg-white/20"
           >
-            먼저 Supabase 설정
+            설정 열기
           </button>
         </div>
       </div>

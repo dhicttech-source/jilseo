@@ -1,10 +1,11 @@
 import { useState } from "react";
+import { isSaved, saveLabel } from "../lib/localRecords";
 import { useSession } from "../store/session";
 import { useStage } from "../store/stage";
 
 /**
  * 동시 전송이 끝난 뒤 전송 바 위에 뜨는 평가 줄. 서비스마다 ★ 최고(1개) / ✕ 실패(여러 개)를 누르면
- * 같은 비교 기록 행의 `_rating`에 저장되고, 성적표 집계 탭의 "동시 전송" 표에 쌓인다.
+ * 같은 비교 기록의 `_rating`에 저장되고(이 기기 파일 → 연결돼 있으면 Supabase), 성적표 집계 탭의 "동시 전송" 표에 쌓인다.
  */
 export function BroadcastRating() {
   const last = useSession((s) => s.lastBroadcast);
@@ -17,12 +18,12 @@ export function BroadcastRating() {
   const ids = Object.keys(last.responses);
   if (ids.length === 0) return null;
   const name = (id: string) => services.find((x) => x.id === id)?.name ?? id;
-  const savable = last.saved === "saved" || last.saved === "queued";
+  const savable = isSaved(last.saved);
   const rating = last.rating ?? { best: null, fail: [] };
 
   const click = (kind: "best" | "fail", id: string) =>
     void rate(kind, id).then((r) => {
-      setNote(r === "queued" ? "대기열에 저장 (연결되면 올라감)" : null);
+      setNote(r === "queued" ? saveLabel(r) : null);
     });
 
   return (

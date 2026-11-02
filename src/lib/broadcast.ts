@@ -8,9 +8,9 @@ import {
 } from "../adapters";
 import { htmlToMarkdown } from "./markdown";
 import { navigatePanel } from "./panels";
-import { saveRow } from "./supabase";
+import { saveComparison } from "./comparisons";
+import type { SaveState } from "./localRecords";
 import { useAttachment } from "../store/attachment";
-import { useCloud } from "../store/cloud";
 import { useSession } from "../store/session";
 import { useStage } from "../store/stage";
 import { useUsage } from "../store/usage";
@@ -33,7 +33,7 @@ export interface BroadcastOutcome {
   okCount: number;
   ms: number;
   /** 전송된 패널 전부의 응답이 끝나고 비교 기록 저장까지 마치면 resolve */
-  completion: Promise<{ responses: Record<string, string>; saved: "saved" | "queued" | "skipped" }>;
+  completion: Promise<{ responses: Record<string, string>; saved: SaveState }>;
 }
 
 /**
@@ -111,13 +111,9 @@ export function runBroadcast(
     // 행 id를 미리 정해 두어 평가(★/✕)가 같은 행을 갱신할 수 있게 한다
     const rowId = crypto.randomUUID();
     const row = opts.pii ? { ...responses, [PII_META_KEY]: opts.pii.meta } : responses;
-    // 임시 전송이면 클라우드에 남기지 않는다
-    let saved: "saved" | "queued" | "skipped" = "skipped";
-    if (!ephemeral) {
-      const cloud = useCloud.getState();
-      saved = await saveRow(cloud.config(), cloud.user, "comparisons", { id: rowId, prompt: body, responses: row, device });
-      void cloud.flush();
-    }
+    // 임시 전송이면 어디에도 남기지 않는다 (이 기기 파일·Supabase 모두)
+    let saved: SaveState = "skipped";
+    if (!ephemeral) saved = await saveComparison({ id: rowId, prompt: body, responses: row, device });
     setLastBroadcast({ prompt: body, responses, at: Date.now(), ephemeral, pii: opts.pii?.mapping, rowId, saved, row });
     if (attachment) moveToNewChatAfterFile(okDefs);
     return { responses, saved };

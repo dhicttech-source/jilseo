@@ -1,34 +1,43 @@
 import { create } from "zustand";
+import { clearComparisons, deleteComparison, listComparisons, syncComparisons, updateComparison } from "../lib/comparisons";
+import type { SaveResult } from "../lib/localRecords";
 import { aggregate, type ComparisonRow, type Scorecard } from "../lib/scorecard";
-import { cloudErrorMessage } from "../lib/cloudError";
-import { deleteOrQueue, getClient, tableName, updateOrQueue } from "../lib/supabase";
 import { useCloud } from "./cloud";
 
 /**
- * 성적표: Supabase comparisons를 최근 순으로 PAGE행씩 읽어 집계하고(집계 탭), 같은 행을 기록 탭이 목록으로 쓴다.
- * 로그인 필요, 캐시 없음. 평가·채택을 고치면 읽어 둔 행을 바로 고쳐 집계를 다시 계산한다.
+ * 성적표: 이 기기의 비교 기록(comparisons.json)을 집계하고(집계 탭), 같은 행을 기록 탭이 목록으로 쓴다.
+ * Supabase에 로그인돼 있으면 열 때마다 서버 기록과 합친다(두 기기 동기화). 평가·채택을 고치면 읽어 둔 행을 바로 고쳐 다시 집계한다.
  */
+
+/** local: Supabase 미설정(이 기기만) / signed_out: 설정했지만 로그인 안 됨 / syncing / synced / error */
+export type SyncState = "local" | "signed_out" | "syncing" | "synced" | "error";
+
 interface ScorecardState {
   card: Scorecard | null;
   rows: ComparisonRow[];
   loading: boolean;
   message: string | null;
   loadedAt: number | null;
-  /** 더 오래된 기록이 남아 있을 수 있음 (마지막 조회가 PAGE행을 꽉 채움) */
-  hasMore: boolean;
+  sync: SyncState;
+  /** 동기화 결과 한 줄 (다른 기기에서 지운 n건 반영 등) 또는 실패 문구 */
+  syncNote: string | null;
   load(): Promise<Scorecard | null>;
-  loadMore(): Promise<void>;
   /** 읽어 둔 행의 responses만 바꾸고 다시 집계 (저장은 호출한 쪽). 없는 행이면 seed가 있을 때 맨 앞에 추가 */
   patchRow(id: string, responses: Record<string, unknown>, seed?: Omit<ComparisonRow, "id" | "responses">): void;
-  /** 기록 탭의 평가·채택 수정: 로컬 반영 + 행 갱신 (실패 시 큐) */
-  saveResponses(id: string, responses: Record<string, unknown>): Promise<"saved" | "queued">;
-  remove(id: string): Promise<"saved" | "queued">;
+  /** 기록 탭의 평가·채택 수정: 화면 반영 + 이 기기 저장 + (연결 시) 서버 갱신 */
+  saveResponses(id: string, responses: Record<string, unknown>): Promise<SaveResult>;
+  remove(id: string): Promise<SaveResult>;
+  /** 설정의 기록 지우기. 반환: 지운 이 기기 기록 수 */
+  clear(scope: "device" | "all"): Promise<number>;
 }
 
-export const PAGE = 500;
-const COLUMNS = "id,prompt,responses,created_at,device";
-
+const EMPTY = "아직 비교 기록이 없습니다";
 const withCard = (rows: ComparisonRow[]) => ({ rows, card: aggregate(rows) });
+
+function syncSummary(removed: number, uploaded: number): string | null {
+  const parts = [removed ? `다른 기기에서 지운 ${removed}건 반영` : "", uploaded ? `이 기기 기록 ${uploaded}건 올림` : ""].filter(Boolean);
+  return parts.length ? parts.join(" · ") : null;
+}
 
 export const useScorecard = create<ScorecardState>((set, get) => ({
   card: null,
@@ -36,44 +45,27 @@ export const useScorecard = create<ScorecardState>((set, get) => ({
   loading: false,
   message: null,
   loadedAt: null,
-  hasMore: false,
+  sync: "local",
+  syncNote: null,
 
   async load() {
-    const cloud = useCloud.getState();
-    const c = getClient(cloud.config());
-    if (!c || cloud.status !== "signed_in") {
-      set({ message: "성적표와 기록은 Supabase 로그인 상태에서만 볼 수 있습니다 (설정)" });
-      return null;
-    }
+    if (get().loading) return get().card;
     set({ loading: true, message: null });
-    const { data, error, status } = await c.from(tableName("comparisons")).select(COLUMNS).order("created_at", { ascending: false }).range(0, PAGE - 1);
-    if (error) {
-      set({ loading: false, message: cloudErrorMessage({ message: error.message, status }, "조회 실패") });
-      return null;
+    const local = await listComparisons();
+    set({ ...withCard(local), loadedAt: Date.now(), message: local.length ? null : EMPTY });
+    const cloud = useCloud.getState();
+    if (!cloud.config() || cloud.status !== "signed_in") {
+      set({ loading: false, sync: cloud.config() ? (cloud.status === "error" ? "error" : "signed_out") : "local", syncNote: cloud.status === "error" ? cloud.message : null });
+      return get().card;
     }
-    const rows = (data ?? []) as ComparisonRow[];
-    const next = withCard(rows);
-    set({ ...next, loading: false, loadedAt: Date.now(), hasMore: rows.length === PAGE, message: rows.length === 0 ? "아직 비교 기록이 없습니다" : null });
-    return next.card;
-  },
-
-  async loadMore() {
-    const c = getClient(useCloud.getState().config());
-    const cur = get().rows;
-    if (!c || get().loading) return;
-    set({ loading: true });
-    const { data, error, status } = await c
-      .from(tableName("comparisons"))
-      .select(COLUMNS)
-      .order("created_at", { ascending: false })
-      .range(cur.length, cur.length + PAGE - 1);
-    if (error) {
-      set({ loading: false, message: cloudErrorMessage({ message: error.message, status }, "조회 실패") });
-      return;
+    set({ sync: "syncing" });
+    try {
+      const r = await syncComparisons();
+      set({ ...withCard(r.rows), loading: false, sync: "synced", syncNote: syncSummary(r.removed, r.uploaded), message: r.rows.length ? null : EMPTY });
+    } catch (e) {
+      set({ loading: false, sync: "error", syncNote: e instanceof Error ? e.message : String(e) });
     }
-    const more = (data ?? []) as ComparisonRow[];
-    const seen = new Set(cur.map((r) => r.id));
-    set({ ...withCard([...cur, ...more.filter((r) => !seen.has(r.id))]), loading: false, hasMore: more.length === PAGE });
+    return get().card;
   },
 
   patchRow(id, responses, seed) {
@@ -87,17 +79,17 @@ export const useScorecard = create<ScorecardState>((set, get) => ({
 
   async saveResponses(id, responses) {
     get().patchRow(id, responses);
-    const cloud = useCloud.getState();
-    const res = await updateOrQueue(cloud.config(), "comparisons", id, { responses });
-    void cloud.flush();
-    return res;
+    return updateComparison(id, responses);
   },
 
   async remove(id) {
     set(withCard(get().rows.filter((r) => r.id !== id)));
-    const cloud = useCloud.getState();
-    const res = await deleteOrQueue(cloud.config(), "comparisons", id);
-    void cloud.flush();
-    return res;
+    return deleteComparison(id);
+  },
+
+  async clear(scope) {
+    const n = await clearComparisons(scope);
+    set({ ...withCard([]), message: EMPTY, syncNote: null });
+    return n;
   },
 }));

@@ -3,7 +3,7 @@ import { BUILTIN_LENSES, GRADE_LABEL } from "../lib/lenses";
 import { LENS_ORDER } from "../lib/presets";
 import { emptyFilter, type RecordFilter } from "../lib/records";
 import type { CellStat } from "../lib/scorecard";
-import { useScorecard } from "../store/scorecard";
+import { useScorecard, type SyncState } from "../store/scorecard";
 import { useStage } from "../store/stage";
 import { ScorecardRecords } from "./ScorecardRecords";
 
@@ -37,6 +37,16 @@ type Tab = "summary" | "records";
  * 생성 모델별 신뢰 비율, 동시 전송 응답 평가(★/✕). 추천의 데이터 원천이며, 자동 라우팅은 하지 않는다.
  * 기록 탭은 같은 조회 결과로 지난 비교를 찾고 평가·채택을 고친다. 집계 칸을 누르면 그 칸의 기록으로 넘어간다.
  */
+/** 기록이 어디서 왔는지: 이 기기만인지, Supabase와 합쳤는지 */
+function syncLine(sync: SyncState, n: number): string {
+  const base = `이 기기 기록 ${n}건`;
+  if (sync === "local") return `${base} · Supabase 미연결 (이 기기만 집계, 두 기기에서 함께 보려면 설정에서 연결)`;
+  if (sync === "signed_out") return `${base} · Supabase 로그인 안 됨 (로그인하면 다른 기기 기록과 합쳐짐)`;
+  if (sync === "syncing") return `${base} · Supabase와 합치는 중…`;
+  if (sync === "synced") return `${base} · Supabase 동기화됨`;
+  return `${base} · Supabase 동기화 실패 (이 기기 기록만 보임)`;
+}
+
 export function Scorecard({ onClose }: { onClose: () => void }) {
   const [tab, setTab] = useState<Tab>("summary");
   const [filter, setFilter] = useState<RecordFilter>(emptyFilter);
@@ -45,6 +55,8 @@ export function Scorecard({ onClose }: { onClose: () => void }) {
   const loading = useScorecard((s) => s.loading);
   const message = useScorecard((s) => s.message);
   const loadedAt = useScorecard((s) => s.loadedAt);
+  const sync = useScorecard((s) => s.sync);
+  const syncNote = useScorecard((s) => s.syncNote);
   const load = useScorecard((s) => s.load);
   const services = useStage((s) => s.services);
   const customLenses = useStage((s) => s.customLenses);
@@ -90,6 +102,10 @@ export function Scorecard({ onClose }: { onClose: () => void }) {
           <button onClick={onClose} className="ml-auto rounded bg-white/10 px-3 py-1 text-xs text-white/80 hover:bg-white/20">
             스테이지로 돌아가기
           </button>
+        </div>
+        <div className={"text-xs " + (sync === "error" ? "text-amber-300" : "text-white/45")}>
+          {syncLine(sync, rows.length)}
+          {syncNote ? ` · ${syncNote}` : ""}
         </div>
         {message && <div className="text-xs text-amber-300">{message}</div>}
 

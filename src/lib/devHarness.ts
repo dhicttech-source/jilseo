@@ -112,7 +112,7 @@ async function execute(cmd: Command): Promise<unknown> {
     case "seed_records": {
       // 화면 확인용: 가짜 행을 성적표 상태에만 넣는다 (네트워크 없음). 이 상태에서 평가·채택·삭제를 누르면 큐에 쌓이니 누르지 말 것
       const rows = (cmd.rows as ComparisonRow[]) ?? [];
-      useScorecard.setState({ rows, card: aggregate(rows), loadedAt: Date.now(), message: null, hasMore: false, loading: false });
+      useScorecard.setState({ rows, card: aggregate(rows), loadedAt: Date.now(), message: null, loading: false });
       return { rows: rows.length };
     }
     case "seed_card": {

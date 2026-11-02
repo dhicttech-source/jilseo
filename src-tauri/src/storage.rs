@@ -1,6 +1,7 @@
 //! 로컬 저장소: `~/Library/Application Support/jilseo/`
 //! - settings.json      마지막 패널 구성 등
 //! - services/*.json    서비스 정의(셀렉터). 최초 실행 시 번들 리소스에서 시드, 이후 사용자 편집본 우선.
+//! - comparisons.json   비교 기록(질문·답변·평가·채택). 성적표·기록 탭의 원본
 
 use std::{fs, path::PathBuf};
 
@@ -111,6 +112,8 @@ pub fn write_diagnostics(app: AppHandle, report: Value) -> Result<String, String
 /// 범용 JSON 스토어. 이름은 화이트리스트로 제한한다.
 const STORE_NAMES: &[&str] = &[
     "workstations", "presets", "session", "queue", "prompts_cache", "notes_cache", "favorites", "usage",
+    // 비교 기록 원본 (성적표·기록 탭). Supabase는 연결했을 때만 동기화·백업
+    "comparisons",
     // 개발 빌드 전용 테스트 하네스 (dmg에는 하네스 코드가 포함되지 않음)
     "dev_commands", "dev_results", "dev_heartbeat",
 ];
@@ -163,6 +166,18 @@ pub fn exports_dir(app: AppHandle) -> Result<String, String> {
     let dir = app_dir(&app)?.join("exports");
     fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     Ok(dir.to_string_lossy().to_string())
+}
+
+/// 저장소 파일의 경로·크기 (설정 화면의 "기록 저장 위치" 표시용). 파일이 없으면 bytes 0, exists false.
+#[tauri::command]
+pub fn store_info(app: AppHandle, name: String) -> Result<Value, String> {
+    let path = store_path(&app, &name)?;
+    let meta = fs::metadata(&path).ok();
+    Ok(serde_json::json!({
+        "path": path.to_string_lossy(),
+        "exists": meta.is_some(),
+        "bytes": meta.map(|m| m.len()).unwrap_or(0),
+    }))
 }
 
 #[tauri::command]

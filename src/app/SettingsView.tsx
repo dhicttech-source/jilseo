@@ -6,6 +6,7 @@ import { BUILTIN_LENSES, VERDICT_BLOCK, resolveLens } from "../lib/lenses";
 import { DEFAULT_REVISE_TEMPLATE, REVISE_TEMPLATE_KEY } from "../lib/revise";
 import { UI_SCALES, useStage } from "../store/stage";
 import { openExportsDir } from "../lib/exportFile";
+import { RecordsStorage } from "./RecordsStorage";
 
 const input = "rounded border border-white/15 bg-white/5 px-2 py-1.5 text-sm text-white/90 outline-none focus:border-white/40";
 
@@ -72,12 +73,15 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
           </button>
         </div>
 
+        <RecordsStorage />
+
         <section className="flex flex-col gap-3 rounded-lg border border-white/10 p-4">
-          <h2 className="text-sm font-medium text-white/85">Supabase (기존 프로젝트에 함께 사용)</h2>
+          <h2 className="text-sm font-medium text-white/85">Supabase (선택: 두 기기 동기화·백업)</h2>
           <p className="text-xs text-white/40">
-            프롬프트 라이브러리·메모·비교 기록·성적표를 두 기기 간 공유합니다. 사용 중인 Supabase 프로젝트의 Project Settings → API Keys 에서 Project URL과 Publishable key를 넣으세요(Secret key는 넣지 마세요).
+            없어도 평가·성적표·기록은 이 기기에서 그대로 됩니다. 연결하면 프롬프트 라이브러리·메모·비교 기록을 두 기기가 함께 쓰고 서버에도 백업됩니다(무료 플랜 가능).
+            Supabase 프로젝트의 Project Settings → API Keys 에서 Project URL과 Publishable key를 넣으세요(Secret key는 넣지 마세요).
             먼저 <code className="text-white/60">supabase/schema.sql</code>을 그 프로젝트의 SQL Editor에서 실행하면 <code className="text-white/60">jilseo_</code> 접두어 테이블이 생깁니다.
-            저장 뒤 아래에서 그 프로젝트의 기존 계정으로 로그인해야 "로그인됨"이 됩니다.
+            로그인 계정은 Supabase 대시보드의 Authentication → Users → Add user에서 이메일·비밀번호로 만들고, 저장 뒤 아래에서 그 계정으로 로그인하세요.
           </p>
           <Field label="Project URL">
             <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://xxxx.supabase.co" className={input} />
@@ -370,7 +374,7 @@ export function SettingsView({ onClose }: { onClose: () => void }) {
             onClick={() => invoke<string>("app_data_dir").then((p) => revealItemInDir(p)).catch(() => {})}
             className="self-start rounded bg-white/10 px-3 py-1 text-xs text-white/80"
           >
-            앱 데이터 폴더 열기 (settings · workstations · queue)
+            앱 데이터 폴더 열기 (comparisons · settings · workstations · queue)
           </button>
           <button onClick={() => void openExportsDir()} className="self-start rounded bg-white/10 px-3 py-1 text-xs text-white/80">
             내보내기 폴더 열기 (exports/*.md)

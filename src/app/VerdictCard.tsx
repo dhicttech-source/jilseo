@@ -3,6 +3,7 @@ import { depthOf, findPreset, sortByLensOrder } from "../lib/presets";
 import { commonPoints, gradeDistribution } from "../lib/consensus";
 import { pipelineToMarkdown } from "../lib/exportMarkdown";
 import { copyText, saveExport } from "../lib/exportFile";
+import { saveLabel } from "../lib/localRecords";
 import { restore } from "../lib/pii/mask";
 import { useState } from "react";
 import { usePipelineResult } from "../store/pipelineResult";
@@ -70,7 +71,7 @@ export function VerdictCard() {
         <span className="font-medium text-white/85">판정 요약</span>
         <span>
           {name(result.generator)} 생성 → 검증 {result.verifiersSent}/{result.verifiersTotal} · {Math.round(result.ms / 1000)}s
-          {result.saved !== "skipped" ? ` · 기록 ${result.saved === "saved" ? "저장" : "큐"}` : result.ephemeral ? " · 🔒 기록 안 함" : ""}
+          {result.saved !== "skipped" ? ` · 기록 ${saveLabel(result.saved)}` : result.ephemeral ? " · 🔒 기록 안 함" : ""}
           {` · ${preset ? preset.name + " · " : ""}${depthOf(result.depth).label}`}
           {result.skipped.length > 0 && ` · 생략 ${result.skipped.map(name).join(", ")}`}
         </span>

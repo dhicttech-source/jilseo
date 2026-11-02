@@ -1,8 +1,8 @@
 import { create } from "zustand";
 import type { Judged } from "../lib/lenses";
 import { buildResponsesRow, runRevise, type PipelineResult } from "../lib/pipeline";
-import { updateOrQueue } from "../lib/supabase";
-import { useCloud } from "./cloud";
+import { updateComparison } from "../lib/comparisons";
+import type { SaveResult } from "../lib/localRecords";
 import { useScorecard } from "./scorecard";
 import { useStage } from "./stage";
 
@@ -15,7 +15,7 @@ interface PipelineResultState {
   /** 카드의 "수정본 요청": 마지막 결과의 판정을 생성 패널에 되돌린다 (전송 1회) */
   revise(): Promise<void>;
   /** 판정 채택: 로컬 갱신 + comparisons 행의 responses 갱신 (실패 시 큐) */
-  judge(serviceId: string, judged: Judged): Promise<"saved" | "queued" | "skipped">;
+  judge(serviceId: string, judged: Judged): Promise<SaveResult | "skipped">;
 }
 
 export const usePipelineResult = create<PipelineResultState>((set, get) => ({
@@ -45,12 +45,9 @@ export const usePipelineResult = create<PipelineResultState>((set, get) => ({
     const next = { ...r, verifiers };
     set({ result: next });
     if (r.saved === "skipped") return "skipped"; // 임시 전송·미저장 기록은 로컬에만 반영
-    const cloud = useCloud.getState();
     const responses = buildResponsesRow(r.generator, r.answer, verifiers, r.revised, { presetId: r.presetId, depth: r.depth, pii: r.piiMeta });
     // 성적표를 열어 둔 상태면 집계에 바로 반영
     useScorecard.getState().patchRow(r.rowId, responses, { prompt: r.prompt, created_at: new Date(r.at).toISOString(), device: useStage.getState().device });
-    const res = await updateOrQueue(cloud.config(), "comparisons", r.rowId, { responses });
-    void cloud.flush();
-    return res;
+    return updateComparison(r.rowId, responses);
   },
 }));

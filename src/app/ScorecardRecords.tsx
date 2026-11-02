@@ -8,6 +8,7 @@ import { usePipelineResult } from "../store/pipelineResult";
 import { useScorecard } from "../store/scorecard";
 import { useSession } from "../store/session";
 import { useStage } from "../store/stage";
+import { saveLabel, type SaveResult } from "../lib/localRecords";
 import { GRADE_CLASS, JUDGE } from "./VerdictCard";
 
 const STEP = 50;
@@ -25,9 +26,6 @@ const firstLine = (s: string) => s.trim().split("\n")[0]?.slice(0, 120) || "(빈
  */
 export function ScorecardRecords({ filter, setFilter, onClose }: { filter: RecordFilter; setFilter: (f: RecordFilter) => void; onClose: () => void }) {
   const rows = useScorecard((s) => s.rows);
-  const hasMore = useScorecard((s) => s.hasMore);
-  const loading = useScorecard((s) => s.loading);
-  const loadMore = useScorecard((s) => s.loadMore);
   const services = useStage((s) => s.services);
   const customLenses = useStage((s) => s.customLenses);
   const [shown, setShown] = useState(STEP);
@@ -105,11 +103,6 @@ export function ScorecardRecords({ filter, setFilter, onClose }: { filter: Recor
             더 보기 ({filtered.length - shown}건 남음)
           </button>
         )}
-        {filtered.length <= shown && hasMore && (
-          <button onClick={() => void loadMore()} disabled={loading} className="rounded bg-white/10 px-3 py-1 text-xs text-white/80 hover:bg-white/20 disabled:opacity-40">
-            {loading ? "불러오는 중…" : "이전 기록 더 불러오기"}
-          </button>
-        )}
       </div>
     </section>
   );
@@ -128,7 +121,7 @@ function RecordView({ d, name, lensName, onClose }: { d: RecordDetail; name: (id
     setNote(m);
     setTimeout(() => setNote(null), 3000);
   };
-  const saved = (r: "saved" | "queued") => flash(r === "saved" ? "저장됨" : "대기열에 저장");
+  const saved = (r: SaveResult) => flash(saveLabel(r));
 
   const rate = (kind: "best" | "fail", id: string) => {
     const cur = d.rating ?? emptyRating();
